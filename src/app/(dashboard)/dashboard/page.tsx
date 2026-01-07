@@ -1,13 +1,13 @@
 import { requireAuth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { Alert } from '@/components/ui/alert'
 import { HorizontalTimeline } from '@/components/dashboard/horizontal-timeline'
 import { StepTimeline } from '@/components/dashboard/step-timeline'
-import { calculateProgress, formatDate, formatCurrency } from '@/lib/utils'
+import { calculateProgress, formatDate, formatDateTime, formatCurrency } from '@/lib/utils'
 import Link from 'next/link'
 import {
   FileText,
@@ -18,6 +18,12 @@ import {
   Home,
   Calendar,
   ArrowRight,
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  Upload,
+  Edit,
+  History,
 } from 'lucide-react'
 
 export default async function DashboardPage() {
@@ -59,7 +65,27 @@ export default async function DashboardPage() {
     where: {
       dossier: { clientId: user.id },
       isRead: false,
-      isFromClient: false,
+      messageType: { in: ['ADMIN', 'SYSTEM'] },
+    },
+  })
+
+  // Get recent activity
+  const recentActivity = await prisma.activityLog.findMany({
+    where: {
+      OR: [
+        { userId: user.id },
+        { dossier: { clientId: user.id } },
+      ],
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 10,
+    include: {
+      user: {
+        select: { firstName: true, lastName: true, role: true },
+      },
+      dossier: {
+        select: { reference: true },
+      },
     },
   })
 
@@ -233,19 +259,111 @@ export default async function DashboardPage() {
             </Card>
           </div>
 
-          {/* Detailed Timeline */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Détail des étapes</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <StepTimeline
-                steps={mainDossier.steps}
-                dossierId={mainDossier.id}
-                currentStepId={currentStep?.id}
-              />
-            </CardContent>
-          </Card>
+          {/* Recent Activity & Detailed Timeline - Side by side on large screens */}
+          <div className="grid lg:grid-cols-3 gap-6">
+            {/* Recent Activity */}
+            <Card className="lg:col-span-1">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <History className="h-4 w-4" />
+                  Activité récente
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {recentActivity.length === 0 ? (
+                  <p className="text-sm text-gray-500 text-center py-4">
+                    Aucune activité récente
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {recentActivity.slice(0, 5).map((activity) => {
+                      const getActivityIcon = () => {
+                        switch (activity.action) {
+                          case 'STEP_VALIDATED':
+                            return <CheckCircle className="h-4 w-4 text-green-500" />
+                          case 'STEP_REJECTED':
+                          case 'DOCUMENT_REJECTED':
+                            return <AlertCircle className="h-4 w-4 text-red-500" />
+                          case 'DOCUMENT_UPLOAD':
+                            return <Upload className="h-4 w-4 text-blue-500" />
+                          case 'PROFILE_UPDATE':
+                          case 'STEP_SUBMITTED':
+                            return <Edit className="h-4 w-4 text-amber-500" />
+                          default:
+                            return <Clock className="h-4 w-4 text-gray-400" />
+                        }
+                      }
+
+                      const getActivityLabel = () => {
+                        switch (activity.action) {
+                          case 'STEP_VALIDATED':
+                            return 'Étape validée'
+                          case 'STEP_REJECTED':
+                            return 'Étape refusée'
+                          case 'STEP_SUBMITTED':
+                            return 'Étape soumise'
+                          case 'DOCUMENT_UPLOAD':
+                            return 'Document déposé'
+                          case 'DOCUMENT_REJECTED':
+                            return 'Document refusé'
+                          case 'PROFILE_UPDATE':
+                            return 'Profil mis à jour'
+                          case 'AVATAR_UPDATE':
+                            return 'Photo mise à jour'
+                          case 'MESSAGE_SENT':
+                            return 'Message envoyé'
+                          case 'SUPPORT_REQUEST':
+                            return 'Demande de support'
+                          case 'DOSSIER_CREATED':
+                            return 'Dossier créé'
+                          default:
+                            return activity.action
+                        }
+                      }
+
+                      const isAdminAction = activity.user?.role === 'ADMIN' || activity.user?.role === 'ADVISOR'
+
+                      return (
+                        <div key={activity.id} className="flex items-start gap-3">
+                          <div className="mt-0.5">
+                            {getActivityIcon()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {getActivityLabel()}
+                            </p>
+                            {activity.details && (
+                              <p className="text-xs text-gray-500 truncate">
+                                {activity.details}
+                              </p>
+                            )}
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              {formatDateTime(activity.createdAt)}
+                              {isAdminAction && ' • par KOPRO'}
+                            </p>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Detailed Timeline */}
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle>Détail des étapes</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <StepTimeline
+                  steps={mainDossier.steps}
+                  dossierId={mainDossier.id}
+                  currentStepId={currentStep?.id}
+                />
+              </CardContent>
+            </Card>
+          </div>
         </>
       )}
     </div>

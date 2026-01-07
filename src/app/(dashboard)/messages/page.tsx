@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { formatDateTime } from '@/lib/utils'
 import { MessageForm } from './message-form'
-import { MessageSquare, User } from 'lucide-react'
+import { MessageSquare, User, Bot, CheckCircle, AlertCircle, Info } from 'lucide-react'
 
 interface Props {
   searchParams: Promise<{ dossier?: string }>
@@ -43,12 +43,12 @@ export default async function MessagesPage({ searchParams }: Props) {
       orderBy: { createdAt: 'asc' },
     })
 
-    // Mark messages as read
+    // Mark messages as read (admin and system messages)
     await prisma.message.updateMany({
       where: {
         dossierId: selectedDossierId,
         isRead: false,
-        isFromClient: false,
+        messageType: { in: ['ADMIN', 'SYSTEM'] },
       },
       data: { isRead: true },
     })
@@ -125,6 +125,45 @@ export default async function MessagesPage({ searchParams }: Props) {
                 ) : (
                   messages.map(message => {
                     const isFromUser = message.senderId === user.id
+                    const isSystem = message.messageType === 'SYSTEM'
+                    const isAdmin = message.messageType === 'ADMIN'
+
+                    // System message - centered with special styling
+                    if (isSystem) {
+                      const getSystemIcon = () => {
+                        switch (message.category) {
+                          case 'STEP_VALIDATION':
+                            return <CheckCircle className="h-4 w-4 text-green-500" />
+                          case 'STEP_REJECTION':
+                            return <AlertCircle className="h-4 w-4 text-red-500" />
+                          default:
+                            return <Info className="h-4 w-4 text-blue-500" />
+                        }
+                      }
+
+                      const getSystemStyle = () => {
+                        switch (message.category) {
+                          case 'STEP_VALIDATION':
+                            return 'bg-green-50 border-green-200 text-green-800'
+                          case 'STEP_REJECTION':
+                            return 'bg-red-50 border-red-200 text-red-800'
+                          default:
+                            return 'bg-blue-50 border-blue-200 text-blue-800'
+                        }
+                      }
+
+                      return (
+                        <div key={message.id} className="flex justify-center my-4">
+                          <div className={`flex items-center gap-2 px-4 py-2 rounded-full border ${getSystemStyle()}`}>
+                            {getSystemIcon()}
+                            <span className="text-sm">{message.content}</span>
+                            <span className="text-xs opacity-70">
+                              {formatDateTime(message.createdAt)}
+                            </span>
+                          </div>
+                        </div>
+                      )
+                    }
 
                     return (
                       <div
@@ -135,6 +174,8 @@ export default async function MessagesPage({ searchParams }: Props) {
                           className={`max-w-[80%] ${
                             isFromUser
                               ? 'bg-primary-600 text-white rounded-l-lg rounded-tr-lg'
+                              : isAdmin
+                              ? 'bg-purple-100 text-gray-900 rounded-r-lg rounded-tl-lg border border-purple-200'
                               : 'bg-gray-100 text-gray-900 rounded-r-lg rounded-tl-lg'
                           } p-4`}
                         >
@@ -142,11 +183,13 @@ export default async function MessagesPage({ searchParams }: Props) {
                             <span className={`text-xs font-medium ${isFromUser ? 'text-primary-100' : 'text-gray-500'}`}>
                               {isFromUser
                                 ? 'Vous'
-                                : `${message.sender.firstName} ${message.sender.lastName}`}
+                                : message.sender
+                                ? `${message.sender.firstName} ${message.sender.lastName}`
+                                : 'KOPRO'}
                             </span>
-                            {!isFromUser && message.sender.role !== 'CLIENT' && (
-                              <Badge variant="info" className="text-xs py-0">
-                                KOPRO
+                            {!isFromUser && isAdmin && (
+                              <Badge variant="secondary" className="text-xs py-0 bg-purple-200 text-purple-800">
+                                Conseiller KOPRO
                               </Badge>
                             )}
                           </div>

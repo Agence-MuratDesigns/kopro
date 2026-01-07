@@ -21,6 +21,14 @@ model User {
   createdById     String?   // ID de l'admin qui a créé le compte
   firstLoginAt    DateTime? // Date de première connexion
   mustChangePassword Boolean @default(true) // Doit changer son mot de passe à la première connexion
+  lastLoginAt     DateTime? // Dernière connexion
+
+  // Profil client
+  address         String?   // Adresse postale
+  addressComplement String? // Complément d'adresse
+  postalCode      String?   // Code postal
+  city            String?   // Ville
+  avatarUrl       String?   // URL de l'avatar
 
   // Relations
   dossiers         Dossier[]           @relation("ClientDossiers")
@@ -178,12 +186,13 @@ model DossierStep {
 model Document {
   id              String    @id @default(cuid())
   name            String
-  type            String
+  type            String    // DEVIS, FACTURE, MANDAT, ATTESTATION, etc.
+  workType        String?   // ISOLATION, HEATING, HOT_WATER, VENTILATION (pour devis/factures)
   fileName        String
   filePath        String
   fileSize        Int
   mimeType        String
-  status          String    @default("PENDING")
+  status          String    @default("PENDING") // PENDING, VALIDATED, REJECTED
   rejectionReason String?
 
   uploadedAt      DateTime  @default(now())
@@ -205,12 +214,13 @@ model Message {
   id              String    @id @default(cuid())
   content         String
   isRead          Boolean   @default(false)
-  isFromClient    Boolean
+  messageType     String    @default("CLIENT") // CLIENT, ADMIN, SYSTEM
+  category        String?   // Pour les messages système: STEP_VALIDATION, STEP_REJECTION, INFO, etc.
   createdAt       DateTime  @default(now())
 
   // Relations
-  senderId        String
-  sender          User      @relation(fields: [senderId], references: [id])
+  senderId        String?   // Nullable pour les messages système
+  sender          User?     @relation(fields: [senderId], references: [id])
   dossierId       String
   dossier         Dossier   @relation(fields: [dossierId], references: [id], onDelete: Cascade)
 

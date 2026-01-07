@@ -56,6 +56,11 @@ export function Sidebar({ user, dossier, unreadNotifications = 0, unreadMessages
         ]
       : []),
     {
+      href: '/documents',
+      label: 'Mes documents',
+      icon: FileText,
+    },
+    {
       href: '/messages',
       label: 'Messages',
       icon: MessageSquare,
@@ -66,6 +71,11 @@ export function Sidebar({ user, dossier, unreadNotifications = 0, unreadMessages
       label: 'Notifications',
       icon: Bell,
       badge: unreadNotifications,
+    },
+    {
+      href: '/profil',
+      label: 'Mon profil',
+      icon: User,
     },
   ]
 
@@ -203,11 +213,11 @@ export function Sidebar({ user, dossier, unreadNotifications = 0, unreadMessages
           {!isCollapsed && (
             <>
               <Link
-                href="/aide"
+                href="/support"
                 className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900"
               >
                 <HelpCircle className="h-5 w-5" />
-                <span className="font-medium">Aide</span>
+                <span className="font-medium">Support & Aide</span>
               </Link>
             </>
           )}

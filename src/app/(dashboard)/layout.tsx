@@ -24,7 +24,7 @@ export default async function DashboardLayout({
       where: {
         dossier: { clientId: user.id },
         isRead: false,
-        isFromClient: false,
+        messageType: { in: ['ADMIN', 'SYSTEM'] },
       },
     }),
   ])
