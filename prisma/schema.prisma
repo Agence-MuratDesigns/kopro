@@ -15,7 +15,7 @@ model User {
   firstName     String
   lastName      String
   phone         String?
-  role          Role      @default(CLIENT)
+  role          String    @default("CLIENT")
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -30,28 +30,22 @@ model User {
   @@map("users")
 }
 
-enum Role {
-  CLIENT
-  ADVISOR    // Conseiller KOPRO
-  ADMIN      // Admin KOPRO
-}
-
 // Dossier de rénovation
 model Dossier {
   id                String    @id @default(cuid())
   reference         String    @unique
-  status            DossierStatus @default(EN_COURS)
+  status            String    @default("EN_COURS")
   currentStepId     String?
 
   // Informations projet
-  projectType       String?   // Type de rénovation
+  projectType       String?
   projectAddress    String?
   projectCity       String?
   projectPostalCode String?
   estimatedBudget   Float?
 
   // Informations MaPrimeRénov
-  mprNumber         String?   // Numéro MaPrimeRénov
+  mprNumber         String?
   mprStatus         String?
   mprAmount         Float?
 
@@ -61,7 +55,7 @@ model Dossier {
   ceeAmount         Float?
 
   // Revenus et éligibilité
-  revenueCategory   String?   // Très modeste, Modeste, Intermédiaire, Supérieur
+  revenueCategory   String?
   householdSize     Int?
 
   createdAt         DateTime  @default(now())
@@ -82,14 +76,6 @@ model Dossier {
   @@map("dossiers")
 }
 
-enum DossierStatus {
-  EN_COURS
-  EN_ATTENTE
-  VALIDE
-  REFUSE
-  TERMINE
-}
-
 // Étape type (template)
 model StepTemplate {
   id              String    @id @default(cuid())
@@ -97,9 +83,9 @@ model StepTemplate {
   name            String
   description     String
   order           Int
-  category        StepCategory
-  requiredDocs    String?   // JSON array of required document types
-  validationRules String?   // JSON validation rules
+  category        String
+  requiredDocs    String?
+  validationRules String?
   autoValidation  Boolean   @default(false)
 
   dossierSteps    DossierStep[]
@@ -107,21 +93,10 @@ model StepTemplate {
   @@map("step_templates")
 }
 
-enum StepCategory {
-  ELIGIBILITE           // Vérification éligibilité
-  AUDIT                 // Audit énergétique
-  DEVIS                 // Obtention devis
-  MPR_DEMANDE           // Demande MaPrimeRénov
-  CEE_DEMANDE           // Demande CEE
-  TRAVAUX               // Réalisation travaux
-  CONTROLE              // Contrôle post-travaux
-  PAIEMENT              // Versement aides
-}
-
 // Étape d'un dossier spécifique
 model DossierStep {
   id              String    @id @default(cuid())
-  status          StepStatus @default(LOCKED)
+  status          String    @default("LOCKED")
   startedAt       DateTime?
   completedAt     DateTime?
   validatedAt     DateTime?
@@ -140,25 +115,16 @@ model DossierStep {
   @@map("dossier_steps")
 }
 
-enum StepStatus {
-  LOCKED        // Verrouillé (étapes précédentes non complétées)
-  AVAILABLE     // Disponible pour action
-  IN_PROGRESS   // En cours
-  PENDING_VALIDATION // En attente de validation KOPRO
-  VALIDATED     // Validé
-  BLOCKED       // Bloqué (problème à résoudre)
-}
-
 // Document
 model Document {
   id              String    @id @default(cuid())
   name            String
-  type            DocumentType
+  type            String
   fileName        String
   filePath        String
   fileSize        Int
   mimeType        String
-  status          DocumentStatus @default(PENDING)
+  status          String    @default("PENDING")
   rejectionReason String?
 
   uploadedAt      DateTime  @default(now())
@@ -173,27 +139,6 @@ model Document {
   step            DossierStep? @relation(fields: [stepId], references: [id])
 
   @@map("documents")
-}
-
-enum DocumentType {
-  PIECE_IDENTITE
-  JUSTIFICATIF_DOMICILE
-  AVIS_IMPOSITION
-  TITRE_PROPRIETE
-  DEVIS
-  FACTURE
-  ATTESTATION_TRAVAUX
-  AUDIT_ENERGETIQUE
-  PHOTOS_AVANT
-  PHOTOS_APRES
-  MANDAT
-  AUTRE
-}
-
-enum DocumentStatus {
-  PENDING
-  VALIDATED
-  REJECTED
 }
 
 // Message
@@ -216,7 +161,7 @@ model Message {
 // Notification
 model Notification {
   id              String    @id @default(cuid())
-  type            NotificationType
+  type            String
   title           String
   message         String
   isRead          Boolean   @default(false)
@@ -230,18 +175,6 @@ model Notification {
   dossier         Dossier?  @relation(fields: [dossierId], references: [id], onDelete: Cascade)
 
   @@map("notifications")
-}
-
-enum NotificationType {
-  STEP_AVAILABLE      // Nouvelle étape disponible
-  STEP_VALIDATED      // Étape validée
-  STEP_BLOCKED        // Étape bloquée
-  DOCUMENT_REQUIRED   // Document requis
-  DOCUMENT_VALIDATED  // Document validé
-  DOCUMENT_REJECTED   // Document refusé
-  MESSAGE_RECEIVED    // Nouveau message
-  DOSSIER_UPDATE      // Mise à jour dossier
-  PAYMENT_INFO        // Info paiement
 }
 
 // Journal d'activité
