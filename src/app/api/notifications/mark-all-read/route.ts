@@ -1,13 +1,15 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { verifyAuth } from '@/lib/auth'
+import { getSession } from '@/lib/auth'
 
 export async function POST() {
   try {
-    const user = await verifyAuth()
-    if (!user) {
-      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+    const session = await getSession()
+    if (!session) {
+      return NextResponse.json({ error: 'Non autorise' }, { status: 401 })
     }
+
+    const user = { id: session.userId }
 
     await prisma.notification.updateMany({
       where: {

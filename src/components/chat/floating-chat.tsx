@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { cn, formatDateTime } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { useSoundNotifications } from '@/hooks/use-sound'
+import { useRealtime, useRealtimeEvent } from '@/contexts/realtime-context'
 import {
   MessageSquare,
   X,
@@ -15,6 +16,10 @@ import {
   AlertCircle,
   Info,
   Bot,
+  Wifi,
+  WifiOff,
+  Minimize2,
+  Maximize2,
 } from 'lucide-react'
 
 interface Message {
@@ -43,6 +48,39 @@ interface FloatingChatProps {
   soundEnabled?: boolean
 }
 
+// Typing indicator component
+function TypingIndicator() {
+  return (
+    <div className="flex items-center gap-1 px-4 py-2">
+      <div className="flex items-center gap-1 bg-gray-100 rounded-full px-3 py-2">
+        <div className="w-2 h-2 bg-gray-400 rounded-full typing-dot" />
+        <div className="w-2 h-2 bg-gray-400 rounded-full typing-dot" />
+        <div className="w-2 h-2 bg-gray-400 rounded-full typing-dot" />
+      </div>
+    </div>
+  )
+}
+
+// Connection status indicator
+function ConnectionStatus({ status }: { status: 'connecting' | 'connected' | 'disconnected' | 'error' }) {
+  const statusConfig = {
+    connecting: { icon: Wifi, label: 'Connexion...', className: 'connection-connecting' },
+    connected: { icon: Wifi, label: 'Connecte', className: 'connection-connected' },
+    disconnected: { icon: WifiOff, label: 'Deconnecte', className: 'connection-disconnected' },
+    error: { icon: WifiOff, label: 'Erreur', className: 'connection-disconnected' },
+  }
+
+  const config = statusConfig[status]
+  const Icon = config.icon
+
+  return (
+    <div className="flex items-center gap-1.5 text-xs text-gray-400">
+      <div className={cn('connection-indicator', config.className)} />
+      <span>{config.label}</span>
+    </div>
+  )
+}
+
 export function FloatingChat({
   userId,
   dossiers,
@@ -51,7 +89,9 @@ export function FloatingChat({
   soundEnabled = true,
 }: FloatingChatProps) {
   const router = useRouter()
+  const { connectionStatus, unreadMessages } = useRealtime()
   const [isOpen, setIsOpen] = useState(false)
+  const [isMinimized, setIsMinimized] = useState(false)
   const [messages, setMessages] = useState<Message[]>(initialMessages)
   const [newMessage, setNewMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -59,8 +99,28 @@ export function FloatingChat({
   const [selectedDossierId, setSelectedDossierId] = useState(dossiers[0]?.id || '')
   const [localUnreadCount, setLocalUnreadCount] = useState(unreadCount)
   const [hasNewMessage, setHasNewMessage] = useState(false)
+  const [isTyping, setIsTyping] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const { playMessage, playClick } = useSoundNotifications(soundEnabled)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const { playMessage, playClick, playSuccess } = useSoundNotifications(soundEnabled)
+
+  // Listen for real-time message events
+  useRealtimeEvent('message', useCallback((event) => {
+    if (event.data?.dossierId === selectedDossierId && isOpen) {
+      // Add the new message to the list
+      setMessages(prev => {
+        // Avoid duplicates
+        if (prev.some(m => m.id === event.data.id)) return prev
+        return [...prev, event.data]
+      })
+      playMessage()
+    } else if (!isOpen) {
+      // Show notification when chat is closed
+      setHasNewMessage(true)
+      playMessage()
+      setTimeout(() => setHasNewMessage(false), 3000)
+    }
+  }, [selectedDossierId, isOpen, playMessage]))
 
   // Scroll to bottom of messages
   const scrollToBottom = () => {
@@ -162,10 +222,22 @@ export function FloatingChat({
 
   const toggleOpen = () => {
     playClick()
-    setIsOpen(!isOpen)
-    if (!isOpen) {
-      setLocalUnreadCount(0)
+    if (isMinimized) {
+      setIsMinimized(false)
+    } else {
+      setIsOpen(!isOpen)
+      if (!isOpen) {
+        setLocalUnreadCount(0)
+        // Focus input when opening
+        setTimeout(() => inputRef.current?.focus(), 100)
+      }
     }
+  }
+
+  const toggleMinimize = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    playClick()
+    setIsMinimized(!isMinimized)
   }
 
   const getMessageIcon = (message: Message) => {
@@ -211,44 +283,70 @@ export function FloatingChat({
         className={cn(
           'fixed bottom-6 right-6 z-50 w-96 max-w-[calc(100vw-3rem)] rounded-2xl shadow-2xl overflow-hidden transition-all duration-300',
           'flex flex-col bg-white border border-gray-200',
-          isOpen ? 'h-[500px] max-h-[calc(100vh-3rem)] opacity-100 scale-100' : 'h-0 opacity-0 scale-95 pointer-events-none'
+          isOpen && !isMinimized && 'h-[500px] max-h-[calc(100vh-3rem)] opacity-100 scale-100',
+          isOpen && isMinimized && 'h-auto opacity-100 scale-100',
+          !isOpen && 'h-0 opacity-0 scale-95 pointer-events-none'
         )}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 bg-primary-600 text-white">
+        <div
+          className="flex items-center justify-between p-4 bg-primary-600 text-white cursor-pointer"
+          onClick={isMinimized ? toggleOpen : undefined}
+        >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center relative">
               <MessageSquare className="h-5 w-5" />
+              {connectionStatus === 'connected' && (
+                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 rounded-full border-2 border-primary-600" />
+              )}
             </div>
             <div>
               <h3 className="font-semibold">Messages KOPRO</h3>
-              <p className="text-xs text-primary-100">Nous répondons rapidement</p>
+              <div className="flex items-center gap-2">
+                <ConnectionStatus status={connectionStatus} />
+              </div>
             </div>
           </div>
-          <button
-            onClick={toggleOpen}
-            className="p-2 hover:bg-white/20 rounded-full transition-colors"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={toggleMinimize}
+              className="p-2 hover:bg-white/20 rounded-full transition-colors"
+              title={isMinimized ? 'Agrandir' : 'Reduire'}
+            >
+              {isMinimized ? (
+                <Maximize2 className="h-4 w-4" />
+              ) : (
+                <Minimize2 className="h-4 w-4" />
+              )}
+            </button>
+            <button
+              onClick={toggleOpen}
+              className="p-2 hover:bg-white/20 rounded-full transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
-        {/* Dossier selector */}
-        {dossiers.length > 1 && (
-          <div className="p-2 border-b bg-gray-50">
-            <select
-              value={selectedDossierId}
-              onChange={(e) => setSelectedDossierId(e.target.value)}
-              className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-            >
-              {dossiers.map(dossier => (
-                <option key={dossier.id} value={dossier.id}>
-                  Dossier {dossier.reference}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+        {/* Content area - hidden when minimized */}
+        {!isMinimized && (
+          <>
+            {/* Dossier selector */}
+            {dossiers.length > 1 && (
+              <div className="p-2 border-b bg-gray-50">
+                <select
+                  value={selectedDossierId}
+                  onChange={(e) => setSelectedDossierId(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                >
+                  {dossiers.map(dossier => (
+                    <option key={dossier.id} value={dossier.id}>
+                      Dossier {dossier.reference}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -318,6 +416,8 @@ export function FloatingChat({
               )
             })
           )}
+          {/* Typing indicator */}
+          {isTyping && <TypingIndicator />}
           <div ref={messagesEndRef} />
         </div>
 
@@ -325,21 +425,22 @@ export function FloatingChat({
         <div className="p-3 border-t bg-white">
           <div className="flex items-center gap-2">
             <input
+              ref={inputRef}
               type="text"
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
               placeholder="Votre message..."
-              className="flex-1 px-4 py-2 border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="flex-1 px-4 py-2 border rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
               disabled={isSending || !selectedDossierId}
             />
             <button
               onClick={handleSend}
               disabled={!newMessage.trim() || isSending || !selectedDossierId}
               className={cn(
-                'w-10 h-10 rounded-full flex items-center justify-center transition-colors',
+                'w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200',
                 newMessage.trim() && !isSending
-                  ? 'bg-primary-600 text-white hover:bg-primary-700'
+                  ? 'bg-primary-600 text-white hover:bg-primary-700 hover:scale-105'
                   : 'bg-gray-200 text-gray-400'
               )}
             >
@@ -351,6 +452,8 @@ export function FloatingChat({
             </button>
           </div>
         </div>
+          </>
+        )}
       </div>
     </>
   )

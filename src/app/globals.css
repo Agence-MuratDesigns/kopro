@@ -120,6 +120,59 @@
   50% { transform: translateY(-5px); }
 }
 
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(14, 165, 233, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(14, 165, 233, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(14, 165, 233, 0);
+  }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
+  20%, 40%, 60%, 80% { transform: translateX(2px); }
+}
+
+@keyframes typing-dots {
+  0%, 20% { opacity: 0.2; }
+  50% { opacity: 1; }
+  100% { opacity: 0.2; }
+}
+
+@keyframes ripple {
+  to {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
 .animate-fade-in {
   animation: fade-in 0.3s ease-out;
 }
@@ -174,4 +227,111 @@
 
 .step-blocked {
   @apply bg-red-500;
+}
+
+/* Additional animations */
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s ease-out;
+}
+
+.animate-slide-in-up {
+  animation: slide-in-up 0.3s ease-out;
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}
+
+.animate-shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+/* Typing indicator dots */
+.typing-dot {
+  animation: typing-dots 1.4s ease-in-out infinite;
+}
+
+.typing-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+/* Ripple effect for buttons */
+.ripple-container {
+  position: relative;
+  overflow: hidden;
+}
+
+.ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(0);
+  animation: ripple 0.6s ease-out;
+  pointer-events: none;
+}
+
+/* Loading skeleton */
+.skeleton {
+  @apply bg-gray-200 animate-pulse rounded;
+}
+
+/* Connection status indicator */
+.connection-indicator {
+  @apply w-2 h-2 rounded-full;
+}
+
+.connection-connected {
+  @apply bg-green-500;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2);
+}
+
+.connection-connecting {
+  @apply bg-yellow-500 animate-pulse;
+}
+
+.connection-disconnected {
+  @apply bg-red-500;
+}
+
+/* Notification badge animation */
+.notification-badge {
+  animation: scale-in 0.2s ease-out;
+}
+
+.notification-badge-pulse {
+  animation: pulse-ring 2s infinite;
+}
+
+/* Focus styles for accessibility */
+.focus-ring:focus-visible {
+  @apply outline-none ring-2 ring-primary-500 ring-offset-2;
+}
+
+/* Smooth loading overlay */
+.loading-overlay {
+  @apply absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center;
+}
+
+/* Toast stack positioning */
+.toast-stack > *:not(:first-child) {
+  margin-top: 0.5rem;
+}
+
+/* Message bubble animations */
+.message-bubble-enter {
+  animation: slide-in-up 0.2s ease-out;
+}
+
+/* Action in progress indicator */
+.action-in-progress {
+  @apply relative;
+}
+
+.action-in-progress::after {
+  content: '';
+  @apply absolute inset-0 bg-primary-500/10 rounded-lg animate-pulse;
 }
