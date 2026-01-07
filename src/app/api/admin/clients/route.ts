@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireRole } from '@/lib/auth'
+import { sendWelcomeEmail } from '@/lib/email'
 import bcrypt from 'bcryptjs'
 
 // GET - List all clients
@@ -59,9 +60,30 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Normalize and trim values
+    const trimmedFirstName = firstName.trim()
+    const trimmedLastName = lastName.trim()
+    const normalizedEmail = email.trim().toLowerCase()
+
+    // Validate name format (2-50 chars, letters, accents, apostrophes, spaces, hyphens)
+    const nameRegex = /^[A-Za-zÀ-ÖØ-öø-ÿ' -]{2,50}$/
+    if (!nameRegex.test(trimmedFirstName)) {
+      return NextResponse.json(
+        { error: 'Le prénom doit contenir entre 2 et 50 caractères (lettres, accents, tirets, apostrophes)' },
+        { status: 400 }
+      )
+    }
+
+    if (!nameRegex.test(trimmedLastName)) {
+      return NextResponse.json(
+        { error: 'Le nom doit contenir entre 2 et 50 caractères (lettres, accents, tirets, apostrophes)' },
+        { status: 400 }
+      )
+    }
+
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email)) {
+    if (!emailRegex.test(normalizedEmail)) {
       return NextResponse.json(
         { error: 'Adresse email invalide' },
         { status: 400 }
@@ -84,14 +106,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if email already exists
+    // Check if email already exists (case-insensitive)
     const existingUser = await prisma.user.findUnique({
-      where: { email },
+      where: { email: normalizedEmail },
     })
 
     if (existingUser) {
       return NextResponse.json(
-        { error: 'Cette adresse email est déjà utilisée' },
+        { error: 'Un compte existe déjà avec cette adresse e-mail.' },
         { status: 400 }
       )
     }
@@ -115,11 +137,11 @@ export async function POST(request: NextRequest) {
       // Create client
       const newClient = await tx.user.create({
         data: {
-          email,
+          email: normalizedEmail,
           password: hashedPassword,
-          firstName,
-          lastName,
-          phone: phone || null,
+          firstName: trimmedFirstName,
+          lastName: trimmedLastName,
+          phone: phone?.trim() || null,
           role: 'CLIENT',
           createdById: admin.id,
           mustChangePassword: true,
@@ -173,7 +195,7 @@ export async function POST(request: NextRequest) {
           dossierId: dossier.id,
           type: 'ACCOUNT_CREATED',
           title: 'Bienvenue sur KOPRO !',
-          message: `Bonjour ${firstName}, votre compte a été créé. Connectez-vous pour renseigner votre identifiant MaPrimeRénov'.`,
+          message: `Bonjour ${trimmedFirstName}, votre compte a été créé. Connectez-vous pour renseigner votre identifiant MaPrimeRénov'.`,
           link: '/dashboard',
         },
       })
@@ -184,15 +206,27 @@ export async function POST(request: NextRequest) {
           userId: admin.id,
           dossierId: dossier.id,
           action: 'CLIENT_CREATED',
-          details: `Compte client créé pour ${firstName} ${lastName} (${email})`,
+          details: `Compte client créé pour ${trimmedFirstName} ${trimmedLastName} (${normalizedEmail})`,
         },
       })
 
       return newClient
     })
 
-    // TODO: Send welcome email (implement email service)
-    console.log(`[EMAIL] Welcome email should be sent to ${email}`)
+    // Send welcome email with credentials
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    const emailResult = await sendWelcomeEmail({
+      firstName: trimmedFirstName,
+      lastName: trimmedLastName,
+      email: normalizedEmail,
+      password: password, // Send the original password (before hashing)
+      loginUrl: `${appUrl}/login`,
+    })
+
+    if (!emailResult.success) {
+      // Log error but don't fail the request - account was created successfully
+      console.error(`[EMAIL] Failed to send welcome email to ${normalizedEmail}:`, emailResult.error)
+    }
 
     return NextResponse.json({
       success: true,
@@ -203,6 +237,7 @@ export async function POST(request: NextRequest) {
         firstName: client.firstName,
         lastName: client.lastName,
       },
+      emailSent: emailResult.success,
     })
   } catch (error) {
     console.error('Error creating client:', error)

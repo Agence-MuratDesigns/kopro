@@ -88,10 +88,19 @@ export default function NewClientPage() {
     setIsLoading(true)
 
     try {
+      // Trim values before submission
+      const trimmedData = {
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        email: formData.email.trim().toLowerCase(),
+        phone: formData.phone.trim(),
+        password: formData.password,
+      }
+
       const response = await fetch('/api/admin/clients', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(trimmedData),
       })
 
       const data = await response.json()
@@ -101,7 +110,7 @@ export default function NewClientPage() {
         return
       }
 
-      setSuccess(`Client ${formData.firstName} ${formData.lastName} créé avec succès ! Un email de bienvenue a été envoyé.`)
+      setSuccess(`Client ${trimmedData.firstName} ${trimmedData.lastName} créé avec succès ! Un email de bienvenue a été envoyé.`)
 
       // Redirect after 2 seconds
       setTimeout(() => {
