@@ -39,7 +39,7 @@ export default async function AdminDashboardPage() {
     prisma.dossier.count({ where: { status: 'TERMINE' } }),
     prisma.dossier.count({ where: { status: 'EN_ATTENTE' } }),
     prisma.user.count({ where: { role: 'CLIENT' } }),
-    prisma.message.count({ where: { isRead: false, isFromClient: true } }),
+    prisma.message.count({ where: { isRead: false, messageType: 'CLIENT' } }),
     prisma.dossierStep.count({ where: { status: 'PENDING_VALIDATION' } }),
     prisma.dossier.findMany({
       take: 5,
