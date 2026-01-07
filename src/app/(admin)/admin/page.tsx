@@ -1,6 +1,7 @@
 import { requireRole } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { formatDate, formatCurrency, stepStatusLabels } from '@/lib/utils'
@@ -15,6 +16,8 @@ import {
   AlertCircle,
   TrendingUp,
   Euro,
+  UserPlus,
+  Key,
 } from 'lucide-react'
 
 export default async function AdminDashboardPage() {
@@ -63,17 +66,54 @@ export default async function AdminDashboardPage() {
 
   const totalAides = (amountsResult._sum.mprAmount || 0) + (amountsResult._sum.ceeAmount || 0)
 
+  // Get pending MPR validations
+  const pendingMprValidations = await prisma.dossier.count({
+    where: { mprStatus: 'PENDING_REVIEW' },
+  })
+
   return (
     <div className="space-y-8 animate-fade-in">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">
-          Tableau de bord administrateur
-        </h1>
-        <p className="text-gray-600 mt-1">
-          Vue d'ensemble de l'activité KOPRO
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Tableau de bord administrateur
+          </h1>
+          <p className="text-gray-600 mt-1">
+            Vue d'ensemble de l'activité KOPRO
+          </p>
+        </div>
+        <Link href="/admin/clients/new">
+          <Button>
+            <UserPlus className="h-4 w-4 mr-2" />
+            Ajouter un client
+          </Button>
+        </Link>
       </div>
+
+      {/* Pending MPR Alert */}
+      {pendingMprValidations > 0 && (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-amber-100 rounded-lg">
+              <Key className="h-5 w-5 text-amber-600" />
+            </div>
+            <div>
+              <p className="font-medium text-amber-800">
+                {pendingMprValidations} identifiant{pendingMprValidations > 1 ? 's' : ''} MaPrimeRénov' à valider
+              </p>
+              <p className="text-sm text-amber-600">
+                Des clients attendent la validation de leur identifiant
+              </p>
+            </div>
+          </div>
+          <Link href="/admin/dossiers?filter=mpr_pending">
+            <Button variant="outline" size="sm" className="border-amber-300 text-amber-700 hover:bg-amber-100">
+              Voir les dossiers
+            </Button>
+          </Link>
+        </div>
+      )}
 
       {/* Stats Grid */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">

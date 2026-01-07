@@ -9,23 +9,26 @@ datasource db {
 
 // Utilisateur (client ou admin KOPRO)
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  password      String
-  firstName     String
-  lastName      String
-  phone         String?
-  role          String    @default("CLIENT")
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id              String    @id @default(cuid())
+  email           String    @unique
+  password        String
+  firstName       String
+  lastName        String
+  phone           String?
+  role            String    @default("CLIENT")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  createdById     String?   // ID de l'admin qui a créé le compte
+  firstLoginAt    DateTime? // Date de première connexion
+  mustChangePassword Boolean @default(true) // Doit changer son mot de passe à la première connexion
 
   // Relations
-  dossiers      Dossier[]           @relation("ClientDossiers")
-  assignedDossiers Dossier[]        @relation("AssignedDossiers")
-  messages      Message[]
-  notifications Notification[]
-  documents     Document[]
-  activityLogs  ActivityLog[]
+  dossiers         Dossier[]           @relation("ClientDossiers")
+  assignedDossiers Dossier[]           @relation("AssignedDossiers")
+  messages         Message[]
+  notifications    Notification[]
+  documents        Document[]
+  activityLogs     ActivityLog[]
 
   @@map("users")
 }
@@ -34,8 +37,17 @@ model User {
 model Dossier {
   id                String    @id @default(cuid())
   reference         String    @unique
-  status            String    @default("EN_COURS")
-  currentStepId     String?
+  status            String    @default("BROUILLON") // BROUILLON, EN_COURS, EN_ATTENTE, VALIDE, REFUSE, TERMINE
+  currentStep       Int       @default(2) // Étape actuelle (commence à 2 car étape 1 = création compte)
+
+  // Informations MaPrimeRénov - Étape 2
+  mprId             String?   // Identifiant MPR (format MPR-XXXXAB)
+  mprStatus         String    @default("DRAFT") // DRAFT, PENDING_REVIEW, APPROVED, REJECTED
+  mprSubmittedAt    DateTime? // Date de soumission de l'identifiant
+  mprLastUpdatedAt  DateTime? // Dernière modification
+  mprReviewedAt     DateTime? // Date de validation/refus admin
+  mprReviewMessage  String?   // Message admin en cas de rejet
+  mprReviewedById   String?   // Admin qui a validé/refusé
 
   // Informations projet
   projectType       String?
@@ -44,15 +56,12 @@ model Dossier {
   projectPostalCode String?
   estimatedBudget   Float?
 
-  // Informations MaPrimeRénov
-  mprNumber         String?
-  mprStatus         String?
-  mprAmount         Float?
+  // Informations financières
+  mprAmount         Float?    // Montant MaPrimeRénov estimé
+  ceeAmount         Float?    // Montant CEE estimé
 
-  // Informations CEE
-  ceeNumber         String?
-  ceeStatus         String?
-  ceeAmount         Float?
+  // Travaux sélectionnés (JSON array)
+  selectedWorks     String?   // ["ISOLATION", "CHAUFFAGE", "EAU_CHAUDE", "VENTILATION"]
 
   // Revenus et éligibilité
   revenueCategory   String?
@@ -62,7 +71,7 @@ model Dossier {
   updatedAt         DateTime  @updatedAt
 
   // Relations
-  clientId          String
+  clientId          String    @unique // Un client = un dossier
   client            User      @relation("ClientDossiers", fields: [clientId], references: [id])
   advisorId         String?
   advisor           User?     @relation("AssignedDossiers", fields: [advisorId], references: [id])
@@ -72,11 +81,28 @@ model Dossier {
   messages          Message[]
   notifications     Notification[]
   activityLogs      ActivityLog[]
+  mprHistory        MprHistory[]
 
   @@map("dossiers")
 }
 
-// Étape type (template)
+// Historique des modifications MPR (traçabilité)
+model MprHistory {
+  id            String    @id @default(cuid())
+  dossierId     String
+  dossier       Dossier   @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+  previousValue String?
+  newValue      String?
+  action        String    // SUBMITTED, MODIFIED, APPROVED, REJECTED
+  actorId       String?   // ID de l'utilisateur (client ou admin)
+  actorType     String    // CLIENT, ADMIN
+  message       String?   // Message associé (ex: raison du rejet)
+  createdAt     DateTime  @default(now())
+
+  @@map("mpr_history")
+}
+
+// Étape type (template) - Les 8 étapes du parcours
 model StepTemplate {
   id              String    @id @default(cuid())
   code            String    @unique
@@ -87,6 +113,7 @@ model StepTemplate {
   requiredDocs    String?
   validationRules String?
   autoValidation  Boolean   @default(false)
+  adminOnly       Boolean   @default(false) // Étape gérée uniquement par admin
 
   dossierSteps    DossierStep[]
 
@@ -96,13 +123,14 @@ model StepTemplate {
 // Étape d'un dossier spécifique
 model DossierStep {
   id              String    @id @default(cuid())
-  status          String    @default("LOCKED")
+  status          String    @default("LOCKED") // LOCKED, AVAILABLE, IN_PROGRESS, PENDING_VALIDATION, VALIDATED, BLOCKED
   startedAt       DateTime?
   completedAt     DateTime?
   validatedAt     DateTime?
   validatedBy     String?
   notes           String?
   blockedReason   String?
+  data            String?   // Données JSON spécifiques à l'étape
 
   dossierId       String
   dossier         Dossier   @relation(fields: [dossierId], references: [id], onDelete: Cascade)

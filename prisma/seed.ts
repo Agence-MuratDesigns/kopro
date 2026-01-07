@@ -3,150 +3,87 @@ import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
 
+// Les 8 étapes du parcours KOPRO
 const stepTemplates = [
   {
-    code: 'ELIGIBILITE_CHECK',
-    name: 'Vérification éligibilité',
-    description: 'Vérification des conditions d\'éligibilité aux aides MaPrimeRénov\' et CEE',
+    code: 'PAIEMENT_VALIDE',
+    name: 'Paiement validé',
+    description: 'Création du compte et validation du paiement initial',
     order: 1,
-    category: 'ELIGIBILITE' as const,
-    requiredDocs: JSON.stringify(['AVIS_IMPOSITION']),
+    category: 'INITIALISATION',
+    requiredDocs: null,
     autoValidation: false,
+    adminOnly: true,
   },
   {
-    code: 'DOCUMENTS_INITIAUX',
-    name: 'Documents initiaux',
-    description: 'Collecte des documents d\'identité et justificatifs',
+    code: 'IDENTIFIANT_MPR',
+    name: 'Identifiant MaPrimeRénov\'',
+    description: 'Renseignez votre identifiant MaPrimeRénov\' obtenu sur maprimerenov.gouv.fr',
     order: 2,
-    category: 'ELIGIBILITE' as const,
-    requiredDocs: JSON.stringify(['PIECE_IDENTITE', 'JUSTIFICATIF_DOMICILE', 'TITRE_PROPRIETE']),
+    category: 'MPR',
+    requiredDocs: null,
     autoValidation: false,
+    adminOnly: false,
   },
   {
-    code: 'MANDAT_SIGNATURE',
-    name: 'Signature du mandat',
-    description: 'Signature du mandat d\'accompagnement KOPRO',
+    code: 'MANDAT_SIGNE',
+    name: 'Mandat signé',
+    description: 'Signature du mandat administratif pour permettre à KOPRO de gérer votre dossier',
     order: 3,
-    category: 'ELIGIBILITE' as const,
+    category: 'DOCUMENTS',
     requiredDocs: JSON.stringify(['MANDAT']),
     autoValidation: false,
+    adminOnly: false,
   },
   {
-    code: 'AUDIT_ENERGETIQUE',
-    name: 'Audit énergétique',
-    description: 'Réalisation de l\'audit énergétique du logement',
+    code: 'TRAVAUX_SELECTIONNES',
+    name: 'Travaux sélectionnés',
+    description: 'Sélectionnez les travaux éligibles concernés par votre projet',
     order: 4,
-    category: 'AUDIT' as const,
-    requiredDocs: JSON.stringify(['AUDIT_ENERGETIQUE', 'PHOTOS_AVANT']),
+    category: 'TRAVAUX',
+    requiredDocs: null,
     autoValidation: false,
+    adminOnly: false,
   },
   {
-    code: 'COLLECTE_DEVIS',
-    name: 'Collecte des devis',
-    description: 'Obtention des devis auprès des artisans RGE',
+    code: 'DEVIS_DEPOSES',
+    name: 'Devis déposés',
+    description: 'Déposez les devis de vos artisans pour chaque type de travaux sélectionné',
     order: 5,
-    category: 'DEVIS' as const,
+    category: 'DOCUMENTS',
     requiredDocs: JSON.stringify(['DEVIS']),
     autoValidation: false,
+    adminOnly: false,
   },
   {
-    code: 'VALIDATION_DEVIS',
-    name: 'Validation des devis',
-    description: 'Validation technique et conformité des devis par KOPRO',
+    code: 'DEPOT_DOSSIER',
+    name: 'Dépôt de dossier',
+    description: 'Vérification et dépôt de votre dossier auprès de MaPrimeRénov\'',
     order: 6,
-    category: 'DEVIS' as const,
+    category: 'VERIFICATION',
     requiredDocs: null,
     autoValidation: false,
+    adminOnly: true,
   },
   {
-    code: 'DEMANDE_MPR',
-    name: 'Dépôt demande MaPrimeRénov\'',
-    description: 'Constitution et dépôt du dossier sur la plateforme MaPrimeRénov\'',
+    code: 'DOSSIER_VALIDE',
+    name: 'Dossier validé',
+    description: 'Votre dossier a été validé par MaPrimeRénov\'',
     order: 7,
-    category: 'MPR_DEMANDE' as const,
+    category: 'VALIDATION',
     requiredDocs: null,
     autoValidation: false,
+    adminOnly: true,
   },
   {
-    code: 'ACCORD_MPR',
-    name: 'Accord MaPrimeRénov\'',
-    description: 'Réception et validation de l\'accord de principe MaPrimeRénov\'',
+    code: 'FACTURE_VERSEMENT',
+    name: 'Facture finale / versement',
+    description: 'Dépôt de la facture finale et versement des aides',
     order: 8,
-    category: 'MPR_DEMANDE' as const,
-    requiredDocs: null,
+    category: 'PAIEMENT',
+    requiredDocs: JSON.stringify(['FACTURE']),
     autoValidation: false,
-  },
-  {
-    code: 'DEMANDE_CEE',
-    name: 'Dépôt demande CEE',
-    description: 'Constitution et dépôt de la demande de Certificats d\'Économie d\'Énergie',
-    order: 9,
-    category: 'CEE_DEMANDE' as const,
-    requiredDocs: null,
-    autoValidation: false,
-  },
-  {
-    code: 'DEMARRAGE_TRAVAUX',
-    name: 'Démarrage des travaux',
-    description: 'Confirmation du démarrage des travaux avec les artisans',
-    order: 10,
-    category: 'TRAVAUX' as const,
-    requiredDocs: null,
-    autoValidation: false,
-  },
-  {
-    code: 'SUIVI_TRAVAUX',
-    name: 'Suivi des travaux',
-    description: 'Suivi de l\'avancement et des étapes intermédiaires',
-    order: 11,
-    category: 'TRAVAUX' as const,
-    requiredDocs: null,
-    autoValidation: false,
-  },
-  {
-    code: 'FIN_TRAVAUX',
-    name: 'Fin des travaux',
-    description: 'Confirmation de la fin des travaux et collecte des justificatifs',
-    order: 12,
-    category: 'TRAVAUX' as const,
-    requiredDocs: JSON.stringify(['FACTURE', 'PHOTOS_APRES', 'ATTESTATION_TRAVAUX']),
-    autoValidation: false,
-  },
-  {
-    code: 'CONTROLE_CONFORMITE',
-    name: 'Contrôle de conformité',
-    description: 'Vérification de la conformité des travaux réalisés',
-    order: 13,
-    category: 'CONTROLE' as const,
-    requiredDocs: null,
-    autoValidation: false,
-  },
-  {
-    code: 'SOLDE_MPR',
-    name: 'Demande solde MaPrimeRénov\'',
-    description: 'Dépôt de la demande de versement du solde MaPrimeRénov\'',
-    order: 14,
-    category: 'PAIEMENT' as const,
-    requiredDocs: null,
-    autoValidation: false,
-  },
-  {
-    code: 'VERSEMENT_CEE',
-    name: 'Versement prime CEE',
-    description: 'Réception du versement de la prime CEE',
-    order: 15,
-    category: 'PAIEMENT' as const,
-    requiredDocs: null,
-    autoValidation: false,
-  },
-  {
-    code: 'CLOTURE_DOSSIER',
-    name: 'Clôture du dossier',
-    description: 'Finalisation et archivage du dossier complet',
-    order: 16,
-    category: 'PAIEMENT' as const,
-    requiredDocs: null,
-    autoValidation: true,
+    adminOnly: false,
   },
 ]
 
@@ -165,7 +102,7 @@ async function main() {
 
   // Create admin user
   const hashedPassword = await bcrypt.hash('admin123', 12)
-  await prisma.user.upsert({
+  const admin = await prisma.user.upsert({
     where: { email: 'admin@kopro.fr' },
     update: {},
     create: {
@@ -174,6 +111,7 @@ async function main() {
       firstName: 'Admin',
       lastName: 'KOPRO',
       role: 'ADMIN',
+      mustChangePassword: false,
     },
   })
   console.log('Admin user created')
@@ -188,11 +126,12 @@ async function main() {
       firstName: 'Marie',
       lastName: 'Dupont',
       role: 'ADVISOR',
+      mustChangePassword: false,
     },
   })
   console.log('Advisor user created')
 
-  // Create demo client
+  // Create demo client (créé par l'admin)
   const clientPassword = await bcrypt.hash('client123', 12)
   const client = await prisma.user.upsert({
     where: { email: 'client@exemple.fr' },
@@ -200,28 +139,36 @@ async function main() {
     create: {
       email: 'client@exemple.fr',
       password: clientPassword,
-      firstName: 'Jean',
-      lastName: 'Martin',
+      firstName: 'Murat',
+      lastName: 'ZOR',
       phone: '0612345678',
       role: 'CLIENT',
+      createdById: admin.id,
+      mustChangePassword: false,
     },
   })
   console.log('Demo client created')
 
+  // Generate reference
+  const year = new Date().getFullYear()
+  const reference = `KPR-${year}-0001`
+
+  // Delete existing dossier if exists
+  const existingDossier = await prisma.dossier.findUnique({
+    where: { clientId: client.id },
+  })
+  if (existingDossier) {
+    await prisma.dossier.delete({ where: { id: existingDossier.id } })
+  }
+
   // Create demo dossier
-  const dossier = await prisma.dossier.upsert({
-    where: { reference: 'KPR-2024-0001' },
-    update: {},
-    create: {
-      reference: 'KPR-2024-0001',
+  const dossier = await prisma.dossier.create({
+    data: {
+      reference,
       clientId: client.id,
-      projectType: 'Rénovation globale',
-      projectAddress: '15 rue de la Paix',
-      projectCity: 'Paris',
-      projectPostalCode: '75001',
-      estimatedBudget: 35000,
-      revenueCategory: 'Modeste',
-      householdSize: 3,
+      status: 'EN_COURS',
+      currentStep: 2,
+      mprStatus: 'DRAFT',
     },
   })
 
@@ -229,25 +176,47 @@ async function main() {
   const templates = await prisma.stepTemplate.findMany({ orderBy: { order: 'asc' } })
   for (let i = 0; i < templates.length; i++) {
     const template = templates[i]
-    const status = i === 0 ? 'AVAILABLE' : 'LOCKED'
+    let status = 'LOCKED'
 
-    await prisma.dossierStep.upsert({
-      where: {
-        dossierId_templateId: {
-          dossierId: dossier.id,
-          templateId: template.id,
-        },
-      },
-      update: { status },
-      create: {
+    if (i === 0) {
+      status = 'VALIDATED'
+    } else if (i === 1) {
+      status = 'AVAILABLE'
+    }
+
+    await prisma.dossierStep.create({
+      data: {
         dossierId: dossier.id,
         templateId: template.id,
         status,
-        startedAt: i === 0 ? new Date() : null,
+        validatedAt: status === 'VALIDATED' ? new Date() : null,
+        validatedBy: status === 'VALIDATED' ? admin.id : null,
       },
     })
   }
   console.log('Demo dossier and steps created')
+
+  // Create welcome notification for client
+  await prisma.notification.create({
+    data: {
+      userId: client.id,
+      dossierId: dossier.id,
+      type: 'ACCOUNT_CREATED',
+      title: 'Bienvenue sur KOPRO !',
+      message: 'Votre compte a été créé. Vous pouvez maintenant renseigner votre identifiant MaPrimeRénov\'.',
+      link: '/dashboard',
+    },
+  })
+
+  // Log activity
+  await prisma.activityLog.create({
+    data: {
+      userId: admin.id,
+      dossierId: dossier.id,
+      action: 'CLIENT_CREATED',
+      details: `Compte client créé pour ${client.firstName} ${client.lastName}`,
+    },
+  })
 
   console.log('Seeding completed!')
 }

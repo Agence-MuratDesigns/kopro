@@ -71,6 +71,7 @@ export async function getDossierWithSteps(dossierId: string) {
           lastName: true,
           phone: true,
           role: true,
+          firstLoginAt: true,
         },
       },
       advisor: {
@@ -94,6 +95,10 @@ export async function getDossierWithSteps(dossierId: string) {
         },
       },
       documents: true,
+      mprHistory: {
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+      },
       _count: {
         select: {
           messages: true,

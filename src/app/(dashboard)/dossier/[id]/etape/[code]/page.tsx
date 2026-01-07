@@ -8,6 +8,7 @@ import { Alert } from '@/components/ui/alert'
 import { stepStatusLabels, stepStatusColors, documentTypeLabels } from '@/lib/utils'
 import { StepActionForm } from './step-action-form'
 import { DocumentUpload } from './document-upload'
+import { MprIdentifierForm } from '@/components/dashboard/mpr-identifier-form'
 import Link from 'next/link'
 import {
   ArrowLeft,
@@ -39,6 +40,16 @@ export default async function StepPage({ params }: Props) {
           template: { order: 'asc' },
         },
       },
+    },
+  })
+
+  // Get MPR info for MPR step
+  const mprInfo = await prisma.dossier.findUnique({
+    where: { id },
+    select: {
+      mprId: true,
+      mprStatus: true,
+      mprReviewMessage: true,
     },
   })
 
@@ -120,6 +131,16 @@ export default async function StepPage({ params }: Props) {
           Cette étape a été validée avec succès.
           {step.notes && <p className="mt-1 text-sm">{step.notes}</p>}
         </Alert>
+      )}
+
+      {/* MPR Identifier Form - Step 2 */}
+      {step.template.code === 'IDENTIFIANT_MPR' && mprInfo && (
+        <MprIdentifierForm
+          dossierId={id}
+          currentMprId={mprInfo.mprId}
+          mprStatus={mprInfo.mprStatus}
+          mprReviewMessage={mprInfo.mprReviewMessage}
+        />
       )}
 
       {/* Required Documents */}
@@ -248,8 +269,8 @@ export default async function StepPage({ params }: Props) {
         </Card>
       )}
 
-      {/* Step Actions */}
-      {(step.status === 'AVAILABLE' || step.status === 'IN_PROGRESS') && (
+      {/* Step Actions - not shown for MPR step which has its own form */}
+      {(step.status === 'AVAILABLE' || step.status === 'IN_PROGRESS') && step.template.code !== 'IDENTIFIANT_MPR' && (
         <Card>
           <CardHeader>
             <CardTitle>Actions</CardTitle>

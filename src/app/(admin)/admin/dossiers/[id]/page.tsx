@@ -9,6 +9,7 @@ import { Alert } from '@/components/ui/alert'
 import { formatDate, formatCurrency, stepStatusLabels, stepStatusColors, documentTypeLabels } from '@/lib/utils'
 import { AdminStepActions } from './admin-step-actions'
 import { AdminDocumentActions } from './admin-document-actions'
+import { AdminMprValidation } from './admin-mpr-validation'
 import Link from 'next/link'
 import {
   ArrowLeft,
@@ -23,6 +24,7 @@ import {
   Check,
   X,
   Clock,
+  Key,
 } from 'lucide-react'
 
 interface Props {
@@ -87,6 +89,13 @@ export default async function AdminDossierPage({ params }: Props) {
       {pendingDocs.length > 0 && (
         <Alert variant="info" title="Documents à vérifier">
           {pendingDocs.length} document(s) en attente de vérification.
+        </Alert>
+      )}
+
+      {/* MPR Alert */}
+      {dossier.mprStatus === 'PENDING_REVIEW' && (
+        <Alert variant="warning" title="Identifiant MaPrimeRénov' à valider">
+          Le client a soumis son identifiant MaPrimeRénov' : <strong>{dossier.mprId}</strong>
         </Alert>
       )}
 
@@ -198,8 +207,8 @@ export default async function AdminDossierPage({ params }: Props) {
                 <p className="text-lg font-bold text-green-700">
                   {dossier.mprAmount ? formatCurrency(dossier.mprAmount) : 'À définir'}
                 </p>
-                {dossier.mprNumber && (
-                  <p className="text-xs text-gray-500">N° {dossier.mprNumber}</p>
+                {dossier.mprId && (
+                  <p className="text-xs text-gray-500">ID: {dossier.mprId}</p>
                 )}
               </div>
               <div className="p-3 bg-blue-50 rounded-lg">
@@ -207,9 +216,6 @@ export default async function AdminDossierPage({ params }: Props) {
                 <p className="text-lg font-bold text-blue-700">
                   {dossier.ceeAmount ? formatCurrency(dossier.ceeAmount) : 'À définir'}
                 </p>
-                {dossier.ceeNumber && (
-                  <p className="text-xs text-gray-500">N° {dossier.ceeNumber}</p>
-                )}
               </div>
             </CardContent>
           </Card>
@@ -217,6 +223,19 @@ export default async function AdminDossierPage({ params }: Props) {
 
         {/* Center - Steps */}
         <div className="lg:col-span-2 space-y-6">
+          {/* MPR Validation */}
+          <AdminMprValidation
+            dossierId={dossier.id}
+            mprId={dossier.mprId}
+            mprStatus={dossier.mprStatus}
+            mprSubmittedAt={dossier.mprSubmittedAt?.toISOString() || null}
+            mprHistory={dossier.mprHistory?.map(h => ({
+              ...h,
+              createdAt: h.createdAt.toISOString(),
+            })) || []}
+            clientName={`${dossier.client.firstName} ${dossier.client.lastName}`}
+          />
+
           {/* Pending Validations */}
           {pendingSteps.length > 0 && (
             <Card className="border-yellow-200 bg-yellow-50">
