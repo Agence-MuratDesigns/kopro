@@ -9,13 +9,18 @@ import { stepStatusLabels, stepStatusColors, documentTypeLabels } from '@/lib/ut
 import { StepActionForm } from './step-action-form'
 import { DocumentUpload } from './document-upload'
 import { MprIdentifierForm } from '@/components/dashboard/mpr-identifier-form'
+import { MandateSignatureForm } from '@/components/dashboard/mandate-signature-form'
+import { WorkSelectionForm } from '@/components/dashboard/work-selection-form'
+import { QuoteDepositForm } from '@/components/dashboard/quote-deposit-form'
+import { WorkAuthorizationForm } from '@/components/dashboard/work-authorization-form'
+import { InvoiceDepositForm } from '@/components/dashboard/invoice-deposit-form'
+import { FinalRecap } from '@/components/dashboard/final-recap'
 import Link from 'next/link'
 import {
   ArrowLeft,
   FileText,
   CheckCircle,
   Clock,
-  Lock,
   AlertCircle,
   Upload,
 } from 'lucide-react'
@@ -24,6 +29,17 @@ interface Props {
   params: Promise<{ id: string; code: string }>
 }
 
+// Step codes that have custom forms
+const CUSTOM_FORM_STEPS = [
+  'MPR_IDENTIFIER',
+  'MANDATE_SIGNATURE',
+  'WORK_SELECTION',
+  'QUOTE_DEPOSIT',
+  'WORK_AUTHORIZATION',
+  'INVOICE_DEPOSIT',
+  'FINAL_RECAP',
+]
+
 export default async function StepPage({ params }: Props) {
   const { id, code } = await params
   const user = await requireAuth()
@@ -31,6 +47,7 @@ export default async function StepPage({ params }: Props) {
   const dossier = await prisma.dossier.findUnique({
     where: { id },
     include: {
+      client: true,
       steps: {
         include: {
           template: true,
@@ -40,16 +57,7 @@ export default async function StepPage({ params }: Props) {
           template: { order: 'asc' },
         },
       },
-    },
-  })
-
-  // Get MPR info for MPR step
-  const mprInfo = await prisma.dossier.findUnique({
-    where: { id },
-    select: {
-      mprId: true,
-      mprStatus: true,
-      mprReviewMessage: true,
+      documents: true,
     },
   })
 
@@ -83,6 +91,14 @@ export default async function StepPage({ params }: Props) {
     missingDocs.length === 0 &&
     step.documents.every(d => d.status !== 'REJECTED')
 
+  // Parse selected works for steps that need it
+  const selectedWorks: string[] = dossier.selectedWorks
+    ? JSON.parse(dossier.selectedWorks)
+    : []
+
+  // Check if this step has a custom form
+  const hasCustomForm = CUSTOM_FORM_STEPS.includes(code)
+
   return (
     <div className="space-y-8 animate-fade-in max-w-4xl mx-auto">
       {/* Header */}
@@ -112,39 +128,138 @@ export default async function StepPage({ params }: Props) {
         </div>
       </div>
 
-      {/* Status Alert */}
-      {step.status === 'BLOCKED' && step.blockedReason && (
-        <Alert variant="error" title="Étape bloquée">
-          {step.blockedReason}
-        </Alert>
+      {/* Status Alert - Only show for non-custom steps */}
+      {!hasCustomForm && (
+        <>
+          {step.status === 'BLOCKED' && step.blockedReason && (
+            <Alert variant="error" title="Étape bloquée">
+              {step.blockedReason}
+            </Alert>
+          )}
+
+          {step.status === 'PENDING_VALIDATION' && (
+            <Alert variant="info" title="En attente de validation">
+              Votre étape a été soumise et est en cours de vérification par l'équipe KOPRO.
+              Vous serez notifié dès qu'elle sera validée.
+            </Alert>
+          )}
+
+          {step.status === 'VALIDATED' && (
+            <Alert variant="success" title="Étape validée">
+              Cette étape a été validée avec succès.
+              {step.notes && <p className="mt-1 text-sm">{step.notes}</p>}
+            </Alert>
+          )}
+        </>
       )}
 
-      {step.status === 'PENDING_VALIDATION' && (
-        <Alert variant="info" title="En attente de validation">
-          Votre étape a été soumise et est en cours de vérification par l'équipe KOPRO.
-          Vous serez notifié dès qu'elle sera validée.
-        </Alert>
-      )}
-
-      {step.status === 'VALIDATED' && (
-        <Alert variant="success" title="Étape validée">
-          Cette étape a été validée avec succès.
-          {step.notes && <p className="mt-1 text-sm">{step.notes}</p>}
-        </Alert>
-      )}
-
-      {/* MPR Identifier Form - Step 2 */}
-      {step.template.code === 'MPR_IDENTIFIER' && mprInfo && (
+      {/* Step 2: MPR Identifier Form */}
+      {code === 'MPR_IDENTIFIER' && (
         <MprIdentifierForm
           dossierId={id}
-          currentMprId={mprInfo.mprId}
-          mprStatus={mprInfo.mprStatus}
-          mprReviewMessage={mprInfo.mprReviewMessage}
+          currentMprId={dossier.mprId}
+          mprStatus={dossier.mprStatus}
+          mprReviewMessage={dossier.mprReviewMessage}
         />
       )}
 
-      {/* Required Documents */}
-      {requiredDocs.length > 0 && (
+      {/* Step 3: Mandate Signature Form */}
+      {code === 'MANDATE_SIGNATURE' && (
+        <MandateSignatureForm
+          dossierId={id}
+          mandatStatus={dossier.mandatStatus}
+          mandatMethod={dossier.mandatMethod}
+          mandatReviewMessage={dossier.mandatReviewMessage}
+        />
+      )}
+
+      {/* Step 4: Work Selection Form */}
+      {code === 'WORK_SELECTION' && (
+        <WorkSelectionForm
+          dossierId={id}
+          selectedWorks={selectedWorks}
+          isValidated={step.status === 'VALIDATED'}
+        />
+      )}
+
+      {/* Step 5: Quote Deposit Form */}
+      {code === 'QUOTE_DEPOSIT' && (
+        <QuoteDepositForm
+          dossierId={id}
+          selectedWorks={selectedWorks}
+          quotesStatus={dossier.quotesStatus}
+          quotesReviewMessage={dossier.quotesReviewMessage}
+          documents={dossier.documents
+            .filter(d => d.type === 'DEVIS')
+            .map(d => ({
+              id: d.id,
+              name: d.name,
+              workType: (d as any).workType || 'UNKNOWN',
+              status: d.status,
+            }))}
+        />
+      )}
+
+      {/* Step 6: Work Authorization Form */}
+      {code === 'WORK_AUTHORIZATION' && (
+        <WorkAuthorizationForm
+          dossierId={id}
+          workStatus={dossier.workStatus}
+          workStartedAt={dossier.workStartedAt?.toISOString() || null}
+        />
+      )}
+
+      {/* Step 7: Invoice Deposit Form */}
+      {code === 'INVOICE_DEPOSIT' && (
+        <InvoiceDepositForm
+          dossierId={id}
+          selectedWorks={selectedWorks}
+          invoicesStatus={dossier.invoicesStatus}
+          invoicesReviewMessage={dossier.invoicesReviewMessage}
+          documents={dossier.documents
+            .filter(d => d.type === 'FACTURE')
+            .map(d => ({
+              id: d.id,
+              name: d.name,
+              workType: (d as any).workType || 'UNKNOWN',
+              status: d.status,
+            }))}
+        />
+      )}
+
+      {/* Step 8: Final Recap */}
+      {code === 'FINAL_RECAP' && (
+        <FinalRecap
+          dossier={{
+            id: dossier.id,
+            reference: dossier.reference,
+            status: dossier.status,
+            createdAt: dossier.createdAt.toISOString(),
+            closedAt: dossier.closedAt?.toISOString() || null,
+            mprId: dossier.mprId,
+            selectedWorks: dossier.selectedWorks,
+            totalWorksAmount: dossier.totalWorksAmount,
+            mprAmount: dossier.mprAmount,
+            ceeAmount: dossier.ceeAmount,
+            mprPaidAmount: dossier.mprPaidAmount,
+            ceePaidAmount: dossier.ceePaidAmount,
+            paymentStatus: dossier.paymentStatus,
+          }}
+          client={{
+            firstName: dossier.client.firstName,
+            lastName: dossier.client.lastName,
+          }}
+          documents={dossier.documents.map(d => ({
+            id: d.id,
+            name: d.name,
+            type: d.type,
+            uploadedAt: d.uploadedAt.toISOString(),
+          }))}
+        />
+      )}
+
+      {/* Required Documents - Only show for non-custom steps */}
+      {!hasCustomForm && requiredDocs.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -225,8 +340,8 @@ export default async function StepPage({ params }: Props) {
         </Card>
       )}
 
-      {/* Uploaded Documents */}
-      {step.documents.length > 0 && (
+      {/* Uploaded Documents - Only show for non-custom steps */}
+      {!hasCustomForm && step.documents.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Documents téléversés</CardTitle>
@@ -269,8 +384,8 @@ export default async function StepPage({ params }: Props) {
         </Card>
       )}
 
-      {/* Step Actions - not shown for MPR step which has its own form */}
-      {(step.status === 'AVAILABLE' || step.status === 'IN_PROGRESS') && step.template.code !== 'MPR_IDENTIFIER' && (
+      {/* Step Actions - Only show for non-custom steps */}
+      {!hasCustomForm && (step.status === 'AVAILABLE' || step.status === 'IN_PROGRESS') && (
         <Card>
           <CardHeader>
             <CardTitle>Actions</CardTitle>
@@ -287,34 +402,36 @@ export default async function StepPage({ params }: Props) {
         </Card>
       )}
 
-      {/* Navigation */}
-      <div className="flex items-center justify-between pt-4 border-t">
-        {previousStep && previousStep.status !== 'LOCKED' ? (
-          <Link href={`/dossier/${id}/etape/${previousStep.template.code}`}>
-            <Button variant="outline">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Étape précédente
-            </Button>
-          </Link>
-        ) : (
-          <div />
-        )}
+      {/* Navigation - Don't show for final recap */}
+      {code !== 'FINAL_RECAP' && (
+        <div className="flex items-center justify-between pt-4 border-t">
+          {previousStep && previousStep.status !== 'LOCKED' ? (
+            <Link href={`/dossier/${id}/etape/${previousStep.template.code}`}>
+              <Button variant="outline">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Étape précédente
+              </Button>
+            </Link>
+          ) : (
+            <div />
+          )}
 
-        {nextStep && nextStep.status !== 'LOCKED' ? (
-          <Link href={`/dossier/${id}/etape/${nextStep.template.code}`}>
-            <Button>
-              Étape suivante
-              <ArrowLeft className="h-4 w-4 ml-2 rotate-180" />
-            </Button>
-          </Link>
-        ) : (
-          <Link href={`/dossier/${id}`}>
-            <Button variant="outline">
-              Voir le dossier
-            </Button>
-          </Link>
-        )}
-      </div>
+          {nextStep && nextStep.status !== 'LOCKED' ? (
+            <Link href={`/dossier/${id}/etape/${nextStep.template.code}`}>
+              <Button>
+                Étape suivante
+                <ArrowLeft className="h-4 w-4 ml-2 rotate-180" />
+              </Button>
+            </Link>
+          ) : (
+            <Link href={`/dossier/${id}`}>
+              <Button variant="outline">
+                Voir le dossier
+              </Button>
+            </Link>
+          )}
+        </div>
+      )}
     </div>
   )
 }
