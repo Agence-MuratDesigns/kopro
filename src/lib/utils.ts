@@ -90,3 +90,9 @@ export const categoryColors: Record<string, string> = {
   CONTROLE: 'bg-yellow-500',
   PAIEMENT: 'bg-teal-500',
 }
+
+export function calculateProgress(steps: { status: string }[]): number {
+  if (!steps || steps.length === 0) return 0
+  const validatedCount = steps.filter(s => s.status === 'VALIDATED').length
+  return Math.round((validatedCount / steps.length) * 100)
+}
