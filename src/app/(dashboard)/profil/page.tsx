@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { formatDate, formatDateTime } from '@/lib/utils'
 import { ProfileForm } from './profile-form'
 import { AvatarUpload } from './avatar-upload'
+import { PreferencesForm } from './preferences-form'
 import {
   User,
   Mail,
@@ -12,6 +13,7 @@ import {
   Calendar,
   Shield,
   Clock,
+  Settings,
 } from 'lucide-react'
 
 export default async function ProfilePage() {
@@ -34,6 +36,10 @@ export default async function ProfilePage() {
       createdAt: true,
       lastLoginAt: true,
       firstLoginAt: true,
+      soundEnabled: true,
+      emailNotifications: true,
+      pushNotifications: true,
+      preferredChannel: true,
     },
   })
 
@@ -132,6 +138,30 @@ export default async function ProfilePage() {
               Contactez votre conseiller KOPRO pour réinitialiser votre mot de passe en toute sécurité.
             </p>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Preferences */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="h-5 w-5" />
+            Préférences
+          </CardTitle>
+          <CardDescription>
+            Personnalisez votre expérience sur KOPRO
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <PreferencesForm
+            userId={fullUser.id}
+            preferences={{
+              soundEnabled: fullUser.soundEnabled,
+              emailNotifications: fullUser.emailNotifications,
+              pushNotifications: fullUser.pushNotifications,
+              preferredChannel: fullUser.preferredChannel,
+            }}
+          />
         </CardContent>
       </Card>
     </div>

@@ -30,6 +30,12 @@ model User {
   city            String?   // Ville
   avatarUrl       String?   // URL de l'avatar
 
+  // Préférences utilisateur
+  soundEnabled        Boolean @default(true)  // Sons activés
+  emailNotifications  Boolean @default(true)  // Notifications email
+  pushNotifications   Boolean @default(true)  // Notifications push/interface
+  preferredChannel    String  @default("BOTH") // INTERFACE, EMAIL, BOTH
+
   // Relations
   dossiers         Dossier[]           @relation("ClientDossiers")
   assignedDossiers Dossier[]           @relation("AssignedDossiers")
