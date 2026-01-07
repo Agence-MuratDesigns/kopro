@@ -1,0 +1,262 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Utilisateur (client ou admin KOPRO)
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
+  firstName     String
+  lastName      String
+  phone         String?
+  role          Role      @default(CLIENT)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  dossiers      Dossier[]           @relation("ClientDossiers")
+  assignedDossiers Dossier[]        @relation("AssignedDossiers")
+  messages      Message[]
+  notifications Notification[]
+  documents     Document[]
+  activityLogs  ActivityLog[]
+
+  @@map("users")
+}
+
+enum Role {
+  CLIENT
+  ADVISOR    // Conseiller KOPRO
+  ADMIN      // Admin KOPRO
+}
+
+// Dossier de rénovation
+model Dossier {
+  id                String    @id @default(cuid())
+  reference         String    @unique
+  status            DossierStatus @default(EN_COURS)
+  currentStepId     String?
+
+  // Informations projet
+  projectType       String?   // Type de rénovation
+  projectAddress    String?
+  projectCity       String?
+  projectPostalCode String?
+  estimatedBudget   Float?
+
+  // Informations MaPrimeRénov
+  mprNumber         String?   // Numéro MaPrimeRénov
+  mprStatus         String?
+  mprAmount         Float?
+
+  // Informations CEE
+  ceeNumber         String?
+  ceeStatus         String?
+  ceeAmount         Float?
+
+  // Revenus et éligibilité
+  revenueCategory   String?   // Très modeste, Modeste, Intermédiaire, Supérieur
+  householdSize     Int?
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  clientId          String
+  client            User      @relation("ClientDossiers", fields: [clientId], references: [id])
+  advisorId         String?
+  advisor           User?     @relation("AssignedDossiers", fields: [advisorId], references: [id])
+
+  steps             DossierStep[]
+  documents         Document[]
+  messages          Message[]
+  notifications     Notification[]
+  activityLogs      ActivityLog[]
+
+  @@map("dossiers")
+}
+
+enum DossierStatus {
+  EN_COURS
+  EN_ATTENTE
+  VALIDE
+  REFUSE
+  TERMINE
+}
+
+// Étape type (template)
+model StepTemplate {
+  id              String    @id @default(cuid())
+  code            String    @unique
+  name            String
+  description     String
+  order           Int
+  category        StepCategory
+  requiredDocs    String?   // JSON array of required document types
+  validationRules String?   // JSON validation rules
+  autoValidation  Boolean   @default(false)
+
+  dossierSteps    DossierStep[]
+
+  @@map("step_templates")
+}
+
+enum StepCategory {
+  ELIGIBILITE           // Vérification éligibilité
+  AUDIT                 // Audit énergétique
+  DEVIS                 // Obtention devis
+  MPR_DEMANDE           // Demande MaPrimeRénov
+  CEE_DEMANDE           // Demande CEE
+  TRAVAUX               // Réalisation travaux
+  CONTROLE              // Contrôle post-travaux
+  PAIEMENT              // Versement aides
+}
+
+// Étape d'un dossier spécifique
+model DossierStep {
+  id              String    @id @default(cuid())
+  status          StepStatus @default(LOCKED)
+  startedAt       DateTime?
+  completedAt     DateTime?
+  validatedAt     DateTime?
+  validatedBy     String?
+  notes           String?
+  blockedReason   String?
+
+  dossierId       String
+  dossier         Dossier   @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+  templateId      String
+  template        StepTemplate @relation(fields: [templateId], references: [id])
+
+  documents       Document[]
+
+  @@unique([dossierId, templateId])
+  @@map("dossier_steps")
+}
+
+enum StepStatus {
+  LOCKED        // Verrouillé (étapes précédentes non complétées)
+  AVAILABLE     // Disponible pour action
+  IN_PROGRESS   // En cours
+  PENDING_VALIDATION // En attente de validation KOPRO
+  VALIDATED     // Validé
+  BLOCKED       // Bloqué (problème à résoudre)
+}
+
+// Document
+model Document {
+  id              String    @id @default(cuid())
+  name            String
+  type            DocumentType
+  fileName        String
+  filePath        String
+  fileSize        Int
+  mimeType        String
+  status          DocumentStatus @default(PENDING)
+  rejectionReason String?
+
+  uploadedAt      DateTime  @default(now())
+  validatedAt     DateTime?
+
+  // Relations
+  uploaderId      String
+  uploader        User      @relation(fields: [uploaderId], references: [id])
+  dossierId       String
+  dossier         Dossier   @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+  stepId          String?
+  step            DossierStep? @relation(fields: [stepId], references: [id])
+
+  @@map("documents")
+}
+
+enum DocumentType {
+  PIECE_IDENTITE
+  JUSTIFICATIF_DOMICILE
+  AVIS_IMPOSITION
+  TITRE_PROPRIETE
+  DEVIS
+  FACTURE
+  ATTESTATION_TRAVAUX
+  AUDIT_ENERGETIQUE
+  PHOTOS_AVANT
+  PHOTOS_APRES
+  MANDAT
+  AUTRE
+}
+
+enum DocumentStatus {
+  PENDING
+  VALIDATED
+  REJECTED
+}
+
+// Message
+model Message {
+  id              String    @id @default(cuid())
+  content         String
+  isRead          Boolean   @default(false)
+  isFromClient    Boolean
+  createdAt       DateTime  @default(now())
+
+  // Relations
+  senderId        String
+  sender          User      @relation(fields: [senderId], references: [id])
+  dossierId       String
+  dossier         Dossier   @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+// Notification
+model Notification {
+  id              String    @id @default(cuid())
+  type            NotificationType
+  title           String
+  message         String
+  isRead          Boolean   @default(false)
+  link            String?
+  createdAt       DateTime  @default(now())
+
+  // Relations
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  dossierId       String?
+  dossier         Dossier?  @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+enum NotificationType {
+  STEP_AVAILABLE      // Nouvelle étape disponible
+  STEP_VALIDATED      // Étape validée
+  STEP_BLOCKED        // Étape bloquée
+  DOCUMENT_REQUIRED   // Document requis
+  DOCUMENT_VALIDATED  // Document validé
+  DOCUMENT_REJECTED   // Document refusé
+  MESSAGE_RECEIVED    // Nouveau message
+  DOSSIER_UPDATE      // Mise à jour dossier
+  PAYMENT_INFO        // Info paiement
+}
+
+// Journal d'activité
+model ActivityLog {
+  id              String    @id @default(cuid())
+  action          String
+  details         String?
+  ipAddress       String?
+  createdAt       DateTime  @default(now())
+
+  // Relations
+  userId          String?
+  user            User?     @relation(fields: [userId], references: [id])
+  dossierId       String?
+  dossier         Dossier?  @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+
+  @@map("activity_logs")
+}
