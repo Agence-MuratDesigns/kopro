@@ -43,7 +43,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Find the MPR step
-    const mprStep = dossier.steps.find(s => s.template.code === 'IDENTIFIANT_MPR')
+    const mprStep = dossier.steps.find(s => s.template.code === 'MPR_IDENTIFIER')
     if (!mprStep) {
       return NextResponse.json(
         { error: 'Étape de l\'identifiant MPR non trouvée' },
