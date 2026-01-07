@@ -37,8 +37,9 @@ model User {
 model Dossier {
   id                String    @id @default(cuid())
   reference         String    @unique
-  status            String    @default("BROUILLON") // BROUILLON, EN_COURS, EN_ATTENTE, VALIDE, REFUSE, TERMINE
+  status            String    @default("BROUILLON") // BROUILLON, EN_COURS, EN_ATTENTE, VALIDE, REFUSE, CLOTURE
   currentStep       Int       @default(2) // Étape actuelle (commence à 2 car étape 1 = création compte)
+  isActive          Boolean   @default(true) // Dossier actif ou clôturé
 
   // Informations MaPrimeRénov - Étape 2
   mprId             String?   // Identifiant MPR (format MPR-XXXXAB)
@@ -48,6 +49,35 @@ model Dossier {
   mprReviewedAt     DateTime? // Date de validation/refus admin
   mprReviewMessage  String?   // Message admin en cas de rejet
   mprReviewedById   String?   // Admin qui a validé/refusé
+  mprCertified      Boolean   @default(false) // Client a certifié l'identifiant
+
+  // Mandat - Étape 3
+  mandatStatus      String    @default("DRAFT") // DRAFT, PENDING_REVIEW, APPROVED, REJECTED
+  mandatSignedAt    DateTime? // Date de signature
+  mandatMethod      String?   // MANUAL, ELECTRONIC
+  mandatReviewMessage String? // Message admin en cas de rejet
+
+  // Travaux sélectionnés - Étape 4 (JSON array)
+  selectedWorks     String?   // ["ISOLATION", "HEATING", "HOT_WATER", "VENTILATION"]
+  worksSelectedAt   DateTime? // Date de sélection
+
+  // Devis - Étape 5
+  quotesStatus      String    @default("DRAFT") // DRAFT, PENDING_REVIEW, APPROVED, REJECTED
+  quotesSubmittedAt DateTime? // Date de soumission
+  quotesReviewMessage String? // Message admin en cas de rejet
+
+  // Autorisation travaux - Étape 6
+  workStartedAt     DateTime? // Date de notification début travaux
+  workStatus        String    @default("NOT_STARTED") // NOT_STARTED, IN_PROGRESS, COMPLETED
+
+  // Factures - Étape 7
+  invoicesStatus    String    @default("DRAFT") // DRAFT, PENDING_REVIEW, APPROVED, REJECTED
+  invoicesSubmittedAt DateTime? // Date de soumission
+  invoicesReviewMessage String? // Message admin en cas de rejet
+
+  // Clôture - Étape 8
+  closedAt          DateTime? // Date de clôture
+  closedById        String?   // Admin qui a clôturé
 
   // Informations projet
   projectType       String?
@@ -59,9 +89,10 @@ model Dossier {
   // Informations financières
   mprAmount         Float?    // Montant MaPrimeRénov estimé
   ceeAmount         Float?    // Montant CEE estimé
-
-  // Travaux sélectionnés (JSON array)
-  selectedWorks     String?   // ["ISOLATION", "CHAUFFAGE", "EAU_CHAUDE", "VENTILATION"]
+  totalWorksAmount  Float?    // Montant total des travaux
+  mprPaidAmount     Float?    // Montant MPR versé
+  ceePaidAmount     Float?    // Montant CEE versé
+  paymentStatus     String    @default("PENDING") // PENDING, IN_PROGRESS, PAID
 
   // Revenus et éligibilité
   revenueCategory   String?
@@ -71,7 +102,7 @@ model Dossier {
   updatedAt         DateTime  @updatedAt
 
   // Relations
-  clientId          String    @unique // Un client = un dossier
+  clientId          String    // Un client peut avoir plusieurs dossiers
   client            User      @relation("ClientDossiers", fields: [clientId], references: [id])
   advisorId         String?
   advisor           User?     @relation("AssignedDossiers", fields: [advisorId], references: [id])

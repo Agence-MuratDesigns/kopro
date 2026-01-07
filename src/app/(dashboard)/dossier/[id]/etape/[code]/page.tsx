@@ -134,7 +134,7 @@ export default async function StepPage({ params }: Props) {
       )}
 
       {/* MPR Identifier Form - Step 2 */}
-      {step.template.code === 'IDENTIFIANT_MPR' && mprInfo && (
+      {step.template.code === 'MPR_IDENTIFIER' && mprInfo && (
         <MprIdentifierForm
           dossierId={id}
           currentMprId={mprInfo.mprId}
@@ -270,7 +270,7 @@ export default async function StepPage({ params }: Props) {
       )}
 
       {/* Step Actions - not shown for MPR step which has its own form */}
-      {(step.status === 'AVAILABLE' || step.status === 'IN_PROGRESS') && step.template.code !== 'IDENTIFIANT_MPR' && (
+      {(step.status === 'AVAILABLE' || step.status === 'IN_PROGRESS') && step.template.code !== 'MPR_IDENTIFIER' && (
         <Card>
           <CardHeader>
             <CardTitle>Actions</CardTitle>

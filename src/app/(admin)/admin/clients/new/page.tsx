@@ -49,6 +49,9 @@ export default function NewClientPage() {
     setError('')
   }
 
+  // Validation du nom/prénom
+  const nameRegex = /^[A-Za-zÀ-ÖØ-öø-ÿ' -]{2,50}$/
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -59,13 +62,25 @@ export default function NewClientPage() {
       return
     }
 
+    // Validation du prénom
+    if (!nameRegex.test(formData.firstName.trim())) {
+      setError('Le prénom doit contenir entre 2 et 50 caractères (lettres, accents, tirets, apostrophes)')
+      return
+    }
+
+    // Validation du nom
+    if (!nameRegex.test(formData.lastName.trim())) {
+      setError('Le nom doit contenir entre 2 et 50 caractères (lettres, accents, tirets, apostrophes)')
+      return
+    }
+
     if (!isPasswordValid) {
       setError('Le mot de passe ne respecte pas les critères de sécurité')
       return
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(formData.email)) {
+    if (!emailRegex.test(formData.email.trim().toLowerCase())) {
       setError('Adresse email invalide')
       return
     }
@@ -252,9 +267,9 @@ export default function NewClientPage() {
               <h4 className="text-sm font-medium text-blue-800 mb-2">À la création du compte :</h4>
               <ul className="text-sm text-blue-700 space-y-1">
                 <li>• Un dossier sera automatiquement créé pour ce client</li>
-                <li>• L'étape 1 (Paiement validé) sera marquée comme complétée</li>
+                <li>• L'étape 1 (Création du compte) sera marquée comme complétée</li>
                 <li>• L'étape 2 (Identifiant MaPrimeRénov') sera débloquée</li>
-                <li>• Un email de bienvenue sera envoyé au client</li>
+                <li>• Un email de bienvenue sera envoyé avec les identifiants de connexion</li>
               </ul>
             </div>
 

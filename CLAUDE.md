@@ -17,365 +17,803 @@ KOPRO est une application SaaS de suivi des dossiers MaPrimeRénov' (MPR) et Cer
 
 ## Architecture des 8 Étapes
 
-Le parcours client est divisé en **8 étapes séquentielles** où chaque étape doit être validée avant de passer à la suivante.
+Le parcours client est divisé en **8 étapes séquentielles**. Chaque étape doit être validée avant de passer à la suivante.
 
-### Étape 1: Création du compte client (ADMIN)
+---
+
+# ÉTAPE 01 — Création du compte client par l'administrateur
 
 **Code**: `CLIENT_CREATION`
 **Acteur**: Admin/Conseiller uniquement
 **Catégorie**: `ADMIN_SETUP`
 
-#### Fonctionnalités
-- Formulaire de création avec champs obligatoires:
-  - Prénom, Nom
-  - Email (validation format)
-  - Téléphone (format français)
-  - Adresse complète du logement (rue, code postal, ville)
-  - Mot de passe temporaire (généré ou saisi)
-- Validation des doublons (email unique)
-- Envoi email de bienvenue avec identifiants (TODO: implémenter avec Resend)
-- Création automatique du dossier associé
+## 1. Contexte et objectif
 
-#### Flux
-1. Admin remplit le formulaire
-2. Système valide les données
-3. Création User + Dossier en transaction
-4. Envoi email de bienvenue
-5. Étape 1 marquée VALIDATED automatiquement
-6. Étape 2 débloquée (AVAILABLE)
+Le parcours débute **par la création du compte client par un administrateur**.
 
-#### API
+- Le client **ne crée jamais lui-même son compte**
+- Cette étape est **entièrement gérée côté administration**
+
+Objectifs :
+- Créer un espace personnel sécurisé pour le client
+- Initialiser son dossier administratif
+- Transmettre les informations de connexion
+- Positionner automatiquement au début du parcours (étape 2)
+
+## 2. Accès côté administrateur
+
+### Bouton d'action
+Libellé : **"Ajouter un client"**
+
+- Accessible uniquement aux profils autorisés (ADMIN, ADVISOR)
+- Au clic : ouverture d'un formulaire dédié
+- Aucun dossier créé tant que le formulaire n'est pas validé
+
+## 3. Formulaire de création
+
+### Champs requis
+
+#### 1. Prénom
+- Type : texte
+- Obligatoire
+- Longueur : 2-50 caractères
+- Caractères autorisés : lettres, accents, apostrophes, espaces, tirets
+- **Regex** : `^[A-Za-zÀ-ÖØ-öø-ÿ' -]{2,50}$`
+
+#### 2. Nom
+- Mêmes règles que le prénom
+
+#### 3. Adresse e-mail
+- Type : email
+- Obligatoire
+- Format email valide
+- **Unique dans le système**
+- Comparaison insensible à la casse
+- Trim des espaces avant validation
+
+#### 4. Mot de passe initial
+- Type : password
+- Obligatoire
+- Généré ou saisi par l'administrateur
+- **Contraintes de sécurité** :
+  - Minimum 8 caractères
+  - Au moins 1 majuscule
+  - Au moins 1 minuscule
+  - Au moins 1 chiffre
+  - Au moins 1 caractère spécial
+- **Regex** : `^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$`
+
+### États du formulaire
+
+| État | Description |
+|------|-------------|
+| Initial | Champs vides |
+| Validation locale | Vérification des champs avant envoi |
+| En cours | Soumission en cours (loader visible) |
+| Succès | Compte créé avec succès |
+| Erreur | Message explicite selon le cas |
+
+Le bouton de validation :
+- Désactivé tant que les champs ne sont pas valides
+- Désactivé pendant le traitement
+
+## 4. Traitement après validation
+
+### 4.1 Création du compte utilisateur
+- Créer un compte avec : prénom, nom, email, mot de passe hashé
+- Associer à un espace personnel sécurisé
+- Initialiser l'état comme **nouveau**
+
+### 4.2 Initialisation du dossier administratif
+
+| Champ | Valeur |
+|-------|--------|
+| Étape actuelle | 2 |
+| Statut du dossier | Brouillon |
+| Première connexion effectuée | Non |
+| Date de création | Date du jour |
+| Créé par | ID Administrateur |
+| Historique | Entrée "Dossier créé" |
+
+### 4.3 Envoi automatique de l'e-mail
+
+Contenu :
+- Confirmation de création du compte
+- Rappel de l'adresse e-mail
+- Mot de passe initial
+- Lien de connexion
+- Explication de la suite du parcours
+
+## 5. États finaux (fin étape 1)
+
+### Côté client
+- Email reçu avec identifiants
+- Peut se connecter
+- Positionné à l'étape 2
+
+### Côté administrateur
+- Client visible dans la liste des dossiers actifs
+- Dossier identifié comme : "En attente des informations MaPrimeRénov'"
+
+## 6. Gestion des erreurs
+
+| Erreur | Comportement |
+|--------|--------------|
+| Email existant | Création bloquée + message "Un compte existe déjà avec cette adresse e-mail." |
+| Email invalide | Blocage immédiat + message d'erreur |
+| Mot de passe non conforme | Blocage + indication des critères manquants |
+| Erreur technique | Aucun compte partiellement créé + message "Une erreur est survenue..." |
+| Échec d'envoi email | Compte créé + erreur loguée + possibilité de renvoyer manuellement |
+
+## 7. API
+
 - `POST /api/admin/clients` - Création client + dossier
 
 ---
 
-### Étape 2: Identifiant MaPrimeRénov' (CLIENT + ADMIN)
+# ÉTAPE 02 — Dépôt et validation de l'identifiant MaPrimeRénov' (MPR)
 
 **Code**: `MPR_IDENTIFIER`
 **Acteur**: Client saisit, Admin valide
 **Catégorie**: `CLIENT_ACTION`
 
-#### Côté Client
-- Formulaire de saisie de l'identifiant MPR
-- Format attendu: `MPR-XXXXXX` (regex: `^MPR-\d{4}[A-Z]{2}\d{6}$`)
-- Instructions claires pour trouver l'identifiant sur le site officiel
-- Lien vers maprimerenov.gouv.fr
-- Bouton de soumission
+## 1. Objectif
 
-#### Côté Admin
-- Liste des dossiers en attente de validation MPR
-- Pour chaque dossier:
-  - Affichage de l'identifiant saisi
-  - Bouton "Valider" (passe étape en VALIDATED)
-  - Bouton "Rejeter" avec champ motif (passe en BLOCKED)
-- Historique des modifications MPR (table MprHistory)
+Permettre au client de renseigner son identifiant MaPrimeRénov' pour que l'équipe administrative puisse :
+- Vérifier la validité/cohérence de l'identifiant
+- Confirmer que le dossier peut continuer
+- Éviter toute erreur avant les étapes engageantes
 
-#### Flux
-1. Client se connecte, voit étape 2 disponible
-2. Client saisit son identifiant MPR
-3. Statut passe en `PENDING_VALIDATION`
-4. Admin reçoit notification
-5. Admin valide ou rejette
-6. Si validé: étape 3 débloquée
-7. Si rejeté: client doit corriger (étape reste BLOCKED)
+**Tant que l'identifiant n'est pas validé, le dossier reste bloqué.**
 
-#### API
+## 2. Écran client
+
+### Éléments affichés
+1. **Champ de saisie** : Identifiant MaPrimeRénov'
+2. **Texte d'aide** : rappel du format + exemple
+3. **Case obligatoire** : "Je certifie que cet identifiant est exact et correspond à mon dossier MaPrimeRénov'."
+4. **Bouton principal** : "Enregistrer mon identifiant"
+5. **Zone de statut** : "En attente de validation" / "Validé" / "Refusé - à corriger"
+
+### Règles anti-erreur
+
+Le bouton "Enregistrer" activé uniquement si :
+- Champ identifiant **non vide**
+- Identifiant respecte le format (regex)
+- Case "je certifie" **cochée**
+
+Si case non cochée :
+> "Veuillez certifier que l'identifiant est correct avant d'enregistrer."
+
+## 3. Validation de format (Regex)
+
+### Format attendu
+Exemple : `MPR-2345AB`
+
+- Commence par `MPR-`
+- Puis **4 chiffres**
+- Puis **2 lettres** (A–Z)
+- Pas d'espace
+- Insensible à la casse à la saisie (normalisation en majuscules)
+
+### Regex stricte
+```
+^MPR-\d{4}[A-Z]{2}$
+```
+
+### Règles
+- Convertir automatiquement en majuscules à l'enregistrement
+- Trim des espaces avant/après
+- Interdire espaces au milieu
+
+✅ Valide : `MPR-2345AB`
+❌ Invalides : `mpr2345ab`, `MPR2345AB`, `MPR-234AB`, `MPR-2345ABC`
+
+## 4. Comportement après enregistrement
+
+### Enregistrement réussi
+- Message : "Identifiant enregistré. Votre dossier est en attente de validation."
+- Statut : `pending_review`
+- Interface verrouille la progression
+
+### Modification ultérieure
+Tant que l'admin n'a pas validé, le client peut modifier :
+- Afficher l'identifiant actuel
+- Bouton : "Modifier mon identifiant"
+- Au clic : champ éditable, case obligatoire, nouvel enregistrement
+- Relance l'état "en attente de validation"
+
+## 5. Statuts système
+
+| Champ | Description |
+|-------|-------------|
+| `mpr_id` | Identifiant MPR enregistré |
+| `mpr_status` | `draft` / `pending_review` / `approved` / `rejected` |
+| `mpr_submitted_at` | Date/heure de soumission |
+| `mpr_last_updated_at` | Date/heure dernière modification |
+| `mpr_reviewed_at` | Date/heure validation admin |
+| `mpr_review_message` | Message admin en cas de rejet |
+
+### Transitions
+- Première soumission : `mpr_status = pending_review`, `mpr_submitted_at = now`
+- Modification client : `mpr_status = pending_review`, `mpr_last_updated_at = now`
+
+## 6. Notifications
+
+### Notification admin (obligatoire)
+> "Nouveau dépôt d'identifiant MPR à vérifier – [Nom Prénom]"
+
+Contenu : nom/prénom, email, identifiant MPR, date/heure, lien direct
+
+### Email client (obligatoire)
+Objet : "Votre identifiant MaPrimeRénov' a bien été reçu"
+Corps : remerciement, rappel identifiant, explication vérification en cours
+
+## 7. Interface admin
+
+### Liste des dossiers
+- Dossiers `pending_review` en tête de liste
+- Badge "À vérifier"
+- Filtre : "À valider (MPR)"
+
+### Actions possibles
+- ✅ **Valider** : "Identifiant valide"
+- ❌ **Refuser** : "Identifiant incorrect" + commentaire obligatoire
+
+### Conséquences
+
+**Si validé** :
+- `mpr_status = approved`
+- Passage à l'étape 3
+- Notification client
+
+**Si refusé** :
+- `mpr_status = rejected`
+- Dossier reste étape 2
+- Affichage côté client : statut "Refusé", message admin, bouton "Modifier"
+- Email client : "Votre identifiant nécessite une correction"
+
+## 8. API
+
 - `POST /api/dossiers/[id]/mpr-identifier` - Soumission client
 - `POST /api/admin/dossiers/[id]/mpr-validate` - Validation admin
 
 ---
 
-### Étape 3: Signature du mandat (CLIENT)
+# ÉTAPE 03 — Signature et dépôt du mandat administratif
 
 **Code**: `MANDATE_SIGNATURE`
 **Acteur**: Client signe
 **Catégorie**: `CLIENT_ACTION`
 
-#### Fonctionnalités
-- Affichage du document de mandat (PDF généré ou template)
-- Case à cocher "J'ai lu et j'accepte les termes du mandat"
-- Signature électronique simple:
-  - Zone de dessin tactile/souris
-  - Ou upload d'une image de signature
-- Horodatage de la signature
-- Génération PDF final avec signature intégrée
+## 1. Déclenchement
 
-#### Flux
-1. Client visualise le mandat complet
-2. Client coche la case d'acceptation
-3. Client signe (dessin ou upload)
-4. Système génère le PDF signé
-5. Document stocké et lié au dossier
-6. Étape validée automatiquement
-7. Étape 4 débloquée
+L'étape 3 devient accessible **uniquement lorsque** l'identifiant MPR (étape 2) est **validé par l'administration**.
 
-#### API
+Cette validation déclenche :
+- Passage à l'étape 3
+- Envoi d'un e-mail au client
+
+## 2. Communication automatique
+
+### E-mail envoyé au client
+**Objet** : "Votre identifiant MaPrimeRénov' est validé – Signature du mandat requise"
+
+**Contenu** :
+- Confirmation de validation de l'identifiant
+- Explication du rôle du mandat
+- **Mandat prérempli joint en PDF**
+- Indication des deux méthodes : signature manuscrite ou électronique
+
+## 3. Écran client
+
+### Objectif
+Permettre de transmettre un mandat signé, simplement et de manière sécurisée.
+
+### Deux options exclusives
+
+#### Option A — Signature manuelle
+- Téléchargement du mandat (PDF prérempli)
+- Signature manuscrite
+- Upload du document signé
+
+#### Option B — Signature électronique
+- Bouton "Signer électroniquement"
+- Redirection vers le processus de signature
+- Retour automatique une fois complété
+
+## 4. Comportement selon le mode
+
+### Cas A — Dépôt manuel
+
+**Côté client** :
+- Upload PDF uniquement
+- Taille maximale définie
+- Bouton : "Envoyer mon mandat signé"
+
+**Après dépôt** :
+- Message : "Mandat reçu. Vérification en cours."
+- Statut : `mandat_status = pending_review`
+- Blocage accès étape suivante
+
+### Cas B — Signature électronique
+
+**Côté client** :
+- Signature complétée en ligne
+- Retour automatique dans l'interface
+
+**Après signature** :
+- Message : "Votre mandat signé a bien été reçu."
+- Statut : `mandat_status = approved`
+- **Passage automatique** à l'étape suivante (aucune validation admin requise)
+
+## 5. Notifications
+
+### Admin
+- À chaque dépôt manuel : "Mandat signé à vérifier – [Nom Prénom]"
+
+### Client
+- Confirmation de réception (message différent selon mode)
+
+## 6. Interface admin
+
+### Actions possibles
+- Consulter le mandat déposé
+- Valider le mandat
+- Refuser avec commentaire
+
+### Décisions
+
+**Mandat validé** :
+- Statut : `approved`
+- Passage à l'étape 4
+- Notification client
+
+**Mandat refusé** :
+- Statut : `rejected`
+- Retour à l'étape 3
+- Message explicatif visible côté client
+- E-mail de demande de correction
+
+## 7. API
+
 - `GET /api/dossiers/[id]/mandate` - Récupérer le template
 - `POST /api/dossiers/[id]/mandate/sign` - Soumettre signature
+- `POST /api/admin/dossiers/[id]/mandate/validate` - Validation admin
 
 ---
 
-### Étape 4: Sélection des travaux (ADMIN)
+# ÉTAPE 04 — Sélection des travaux éligibles
 
 **Code**: `WORK_SELECTION`
-**Acteur**: Admin/Conseiller
-**Catégorie**: `ADMIN_ACTION`
+**Acteur**: Client
+**Catégorie**: `CLIENT_ACTION`
 
-#### Fonctionnalités
-- Interface de sélection des types de travaux:
-  - Isolation (combles, murs, planchers)
-  - Chauffage (PAC, chaudière biomasse, poêle)
-  - Ventilation (VMC)
-  - Menuiseries (fenêtres, portes)
-  - Solaire (panneaux, chauffe-eau)
-- Estimation automatique des aides selon:
-  - Type de travaux
-  - Revenus du ménage (catégorie MPR)
-  - Zone géographique
-- Affichage des montants estimés MPR + CEE
-- Notes/commentaires pour le client
+## 1. Objectif
 
-#### Flux
-1. Admin accède au dossier
-2. Sélectionne les travaux prévus
-3. Système calcule les estimations
-4. Admin valide la sélection
-5. Client notifié des travaux et estimations
-6. Étape 5 débloquée
+Permettre au client d'indiquer les types de travaux envisagés pour structurer la suite du dossier.
 
-#### API
-- `GET /api/works/types` - Liste des types de travaux
-- `POST /api/admin/dossiers/[id]/works` - Enregistrer sélection
-- `GET /api/dossiers/[id]/estimates` - Calculer estimations
+**Aucune validation administrative requise.**
+
+## 2. Écran client
+
+### Travaux proposés (cases à cocher)
+
+Le client peut sélectionner **un ou plusieurs** postes :
+- ☐ Isolation / Menuiseries
+- ☐ Chauffage performant
+- ☐ Eau chaude sanitaire
+- ☐ Ventilation
+
+Sélection libre, aucun minimum ni maximum imposé.
+
+### Validation
+
+Bouton : **"Valider les travaux sélectionnés"**
+
+Conditions d'activation :
+- Au moins **une case cochée**
+
+## 3. Comportement après validation
+
+### Côté client
+- Message de confirmation
+- Information : "À l'étape suivante, vous devrez déposer les devis correspondant aux travaux sélectionnés."
+
+### Notifications
+- Notification admin informative : "Travaux sélectionnés – [Nom Prénom]"
+- E-mail client de confirmation (facultatif)
+
+### Système
+- Passage automatique à l'étape 5
+- Enregistrement des types de travaux sélectionnés
+
+## 4. API
+
+- `POST /api/dossiers/[id]/works` - Enregistrer sélection
+- `GET /api/dossiers/[id]/works` - Récupérer travaux sélectionnés
 
 ---
 
-### Étape 5: Dépôt du devis (CLIENT + ADMIN)
+# ÉTAPE 05 — Dépôt des devis
 
 **Code**: `QUOTE_DEPOSIT`
 **Acteur**: Client upload, Admin valide
 **Catégorie**: `CLIENT_ACTION`
 
-#### Côté Client
-- Zone d'upload drag & drop
-- Formats acceptés: PDF, JPG, PNG
-- Taille max: 10 Mo par fichier
-- Liste des devis uploadés avec statut
-- Possibilité de supprimer avant validation
+## 1. Objectif
 
-#### Côté Admin
-- Visualisation des devis uploadés
-- Pour chaque devis:
-  - Prévisualisation inline (PDF viewer)
-  - Validation / Rejet avec motif
-- Saisie des montants réels:
-  - Montant HT
-  - Montant TTC
-  - Détail par type de travaux
+Collecter l'ensemble des devis nécessaires, en fonction des travaux sélectionnés à l'étape 4.
 
-#### Flux
-1. Client upload un ou plusieurs devis
-2. Statut: `PENDING_VALIDATION`
-3. Admin reçoit notification
-4. Admin examine et valide/rejette
-5. Si rejet: client doit renvoyer
-6. Si validation: étape 6 débloquée
+**Validation administrative obligatoire.**
 
-#### API
-- `POST /api/dossiers/[id]/documents/upload` - Upload fichier
-- `GET /api/dossiers/[id]/documents` - Liste documents
-- `DELETE /api/dossiers/[id]/documents/[docId]` - Supprimer
-- `POST /api/admin/dossiers/[id]/quote/validate` - Valider devis
+## 2. Écran client
+
+### Structure dynamique
+
+Pour chaque type de travaux sélectionné :
+- Une **zone de dépôt dédiée**
+- Possibilité de déposer **un ou plusieurs fichiers PDF**
+
+Exemple :
+- Isolation / Menuiserie → zone dédiée
+- Chauffage performant → zone dédiée
+
+### Contraintes de dépôt
+- Format PDF uniquement
+- Nombre de fichiers libre
+- Taille maximale par fichier : 10 Mo
+
+## 3. Validation du dépôt
+
+### Actions obligatoires
+1. Dépôt de fichiers dans chaque zone correspondante
+2. Case obligatoire : "Je confirme avoir déposé l'ensemble des devis nécessaires."
+3. Bouton : **"Valider le dépôt des devis"**
+
+## 4. Comportement après validation
+
+### Côté client
+- Message : "Vos devis ont bien été transmis. Ils sont en cours de vérification."
+- Statut : `devis_status = pending_review`
+- Accès bloqué à l'étape suivante
+
+### Notifications
+
+**Admin** :
+- Notification prioritaire : "Devis à vérifier – [Nom Prénom]"
+- Dossier mis en avant dans la liste
+
+**Client** :
+- E-mail de confirmation de dépôt
+- Rappel que la validation est en cours
+
+## 5. Interface admin
+
+### Actions possibles
+- Consulter chaque devis
+- Vérifier conformité réglementaire
+- Valider l'ensemble
+- Refuser (globalement ou partiellement)
+
+### Décisions
+
+**Devis validés** :
+- Passage à l'étape 6
+- Notification client
+
+**Devis refusés** :
+- Retour à l'étape 5
+- Message détaillé (ex : devis manquant, non conforme)
+- Client invité à corriger et redéposer
+
+## 6. API
+
+- `POST /api/dossiers/[id]/quotes/upload` - Upload devis
+- `GET /api/dossiers/[id]/quotes` - Liste devis
+- `DELETE /api/dossiers/[id]/quotes/[docId]` - Supprimer
+- `POST /api/admin/dossiers/[id]/quotes/validate` - Valider devis
 
 ---
 
-### Étape 6: Autorisation de début des travaux (ADMIN)
+# ÉTAPE 06 — Autorisation de démarrage des travaux
 
 **Code**: `WORK_AUTHORIZATION`
-**Acteur**: Admin uniquement
-**Catégorie**: `ADMIN_ACTION`
+**Acteur**: Admin autorise, Client notifie démarrage
+**Catégorie**: `ADMIN_ACTION` puis `CLIENT_ACTION`
 
-#### Fonctionnalités
-- Checklist admin avant autorisation:
-  - [ ] Devis validé
-  - [ ] Montants corrects
-  - [ ] Entreprise RGE vérifiée
-  - [ ] Délais respectés
-- Bouton "Autoriser le démarrage des travaux"
-- Notification automatique au client
-- Date d'autorisation enregistrée
+## 1. Déclenchement
 
-#### Flux
-1. Admin vérifie tous les prérequis
-2. Coche les items de la checklist
-3. Valide l'autorisation
-4. Client reçoit notification "Vous pouvez démarrer vos travaux"
-5. Étape 7 débloquée
+L'étape 6 devient accessible lorsque :
+- L'ensemble des devis (étape 5) a été **validé par l'administration**
+- Les notifications de validation ont été envoyées
 
-#### API
-- `POST /api/admin/dossiers/[id]/authorize-work`
+À ce stade, le dossier est **administrativement conforme** pour le démarrage.
+
+## 2. Communication après validation des devis
+
+### Message client (e-mail + interface)
+
+- Confirmation que les devis sont conformes
+- Autorisation officielle de démarrer les travaux
+- Rappel : "Vous pouvez désormais démarrer les travaux avec les entreprises sélectionnées."
+
+## 3. Écran client
+
+### Contenu informatif
+- Message de confirmation de conformité
+- Rappel des obligations :
+  - Conserver toutes les factures
+  - Conserver les attestations de fin de travaux
+  - Ne pas perdre les documents originaux
+
+### Action client
+
+Bouton : **"Notifier le début des travaux"**
+
+Règles :
+- Cliquable une seule fois
+- Confirmation demandée : "Confirmez-vous que les travaux ont bien démarré ?"
+
+## 4. Comportement après notification
+
+### Côté client
+- Message : "Merci. Le début des travaux a bien été signalé."
+- Statut : `travaux_status = in_progress`
+- Accès à l'étape suivante
+
+### Côté admin
+- Notification : "Travaux démarrés – [Nom Prénom]"
+- Mise à jour du statut : "Travaux en cours"
+
+## 5. Suivi pendant les travaux
+
+### Côté système
+- Aucune action obligatoire du client
+- Dossier reste en état "Travaux en cours"
+
+### Côté admin
+Possibilité d'envoyer :
+- Rappels
+- Messages d'information
+- Notifications programmées
+
+### Communication recommandée
+Dans les semaines suivant le démarrage :
+- Confirmation d'éligibilité au versement des aides
+- Rappel des documents à fournir à la fin
+
+## 6. API
+
+- `POST /api/dossiers/[id]/work-started` - Client notifie début travaux
+- `GET /api/dossiers/[id]/work-status` - Statut des travaux
 
 ---
 
-### Étape 7: Dépôt de la facture (CLIENT + ADMIN)
+# ÉTAPE 07 — Fin des travaux et dépôt des factures finales
 
 **Code**: `INVOICE_DEPOSIT`
 **Acteur**: Client upload, Admin valide
 **Catégorie**: `CLIENT_ACTION`
 
-#### Côté Client
-- Zone d'upload similaire aux devis
-- Champs obligatoires:
-  - Facture PDF
-  - Date des travaux (début/fin)
-  - Photos avant/après (optionnel mais recommandé)
-- Attestation sur l'honneur de fin de travaux
+## 1. Objectif
 
-#### Côté Admin
-- Vérification facture:
-  - Montants conformes au devis
-  - Mentions légales présentes
-  - Qualification RGE de l'entreprise
-- Validation ou demande de correction
+Permettre au client de :
+- Déclarer la fin des travaux
+- Déposer l'ensemble des **factures finales**
+- Transmettre les documents nécessaires à la clôture
 
-#### Flux
-1. Client upload facture + attestation
-2. Statut: `PENDING_VALIDATION`
-3. Admin vérifie la conformité
-4. Validation ou rejet avec motif
-5. Si validé: étape 8 débloquée
+**Étape obligatoire pour finaliser le dossier.**
 
-#### API
-- `POST /api/dossiers/[id]/invoice/upload`
-- `POST /api/admin/dossiers/[id]/invoice/validate`
+## 2. Écran client
+
+### Structure
+- Zones de dépôt similaires à l'étape devis
+- Organisation par entreprise ou par type de travaux
+- Acceptation de **plusieurs fichiers PDF**
+
+### Contraintes
+- Format PDF uniquement
+- Taille maximale définie
+- Possibilité de supprimer/remplacer avant validation
+
+## 3. Validation du dépôt
+
+### Actions obligatoires
+1. Dépôt des factures dans les zones prévues
+2. Case obligatoire : "Je confirme avoir déposé l'ensemble des factures finales correspondant aux travaux réalisés."
+3. Bouton : **"Valider le dépôt des factures"**
+
+## 4. Comportement après validation
+
+### Côté client
+- Message : "Vos factures ont bien été transmises. Elles sont en cours de vérification."
+- Statut : `factures_status = pending_review`
+- Modification impossible sans retour admin
+
+### Notifications
+
+**Admin** :
+- Notification prioritaire : "Factures finales déposées – [Nom Prénom]"
+- Accès direct aux documents
+
+**Client** :
+- E-mail de confirmation de dépôt
+
+## 5. Interface admin
+
+### Actions possibles
+- Consultation de chaque facture
+- Vérification :
+  - Conformité avec les devis validés
+  - Cohérence des montants
+  - Présence des mentions obligatoires
+
+### Décisions
+
+**Factures conformes** :
+- Statut : `factures_status = approved`
+- Passage à l'étape finale
+- Notification client
+
+**Factures non conformes** :
+- Statut : `factures_status = rejected`
+- Message détaillé côté client
+- Possibilité de redéposer
+
+## 6. API
+
+- `POST /api/dossiers/[id]/invoices/upload` - Upload facture
+- `GET /api/dossiers/[id]/invoices` - Liste factures
+- `DELETE /api/dossiers/[id]/invoices/[docId]` - Supprimer
+- `POST /api/admin/dossiers/[id]/invoices/validate` - Valider factures
 
 ---
 
-### Étape 8: Récapitulatif et clôture (ADMIN + CLIENT)
+# ÉTAPE 08 — Récapitulatif final, clôture et accès multi-dossiers
 
 **Code**: `FINAL_RECAP`
 **Acteur**: Admin finalise, Client consulte
 **Catégorie**: `FINAL`
 
-#### Fonctionnalités
-- Récapitulatif complet du dossier:
-  - Timeline des étapes avec dates
-  - Documents générés
-  - Montants finaux MPR + CEE
-  - Statut de versement des aides
-- Génération du rapport final PDF
-- Bouton de clôture admin
-- Archivage du dossier
+## 1. Objectif
 
-#### Côté Client
-- Vue récapitulative read-only
-- Téléchargement de tous les documents
-- Statut des versements
+L'étape 8 constitue **l'écran de clôture et de synthèse du dossier**.
 
-#### Côté Admin
-- Saisie des montants réellement versés
-- Date de versement MPR
-- Date de versement CEE
-- Clôture définitive du dossier
+Buts :
+- Récapituler l'ensemble des informations administratives
+- Permettre de consulter et télécharger tous les documents
+- Informer sur l'état du versement des aides
+- Offrir un point d'entrée vers la gestion de **nouveaux dossiers**
 
-#### API
-- `GET /api/dossiers/[id]/recap`
-- `POST /api/admin/dossiers/[id]/finalize`
-- `GET /api/dossiers/[id]/documents/download-all`
+**Cette étape n'est pas bloquante et reste accessible après clôture.**
+
+## 2. Accès et statut
+
+### Condition d'accès
+- Factures finales validées
+- Dossier administrativement complet
+- Aucune action client requise
+
+### Statut global
+- `Statut : Dossier clôturé`
+- `Dossier actif : Non`
+
+## 3. Écran client - Structure
+
+### Section 1 — Informations générales
+
+| Élément | Description |
+|---------|-------------|
+| Numéro de dossier KOPRO | Référence unique interne |
+| Identité du client | Nom + prénom |
+| Identifiant MaPrimeRénov' | MPR-XXXXXX |
+| Date de création | Date |
+| Date de clôture | Date |
+| Statut global | Clôturé |
+
+### Section 2 — Travaux réalisés
+
+- Liste des travaux effectués :
+  - Isolation / Menuiseries
+  - Chauffage performant
+  - Eau chaude sanitaire
+  - Ventilation
+- Uniquement les travaux réellement réalisés
+- Entreprises intervenantes (si disponibles)
+- Dates de réalisation (si disponibles)
+
+### Section 3 — Montants & aides
+
+| Élément | Description |
+|---------|-------------|
+| Montant total des travaux | Total facturé |
+| Montant des aides estimées | MaPrimeRénov' + CEE |
+| Statut du versement | En cours / Validé / Versé |
+| Date prévisionnelle | Estimation |
+
+⚠️ Mention : "Les délais de versement peuvent varier selon les organismes."
+
+### Section 4 — Documents du dossier
+
+**Catégories** :
+1. **Documents administratifs** : Mandat signé, attestations
+2. **Documents techniques** : Devis validés, factures finales, attestations fin travaux
+
+**Affichage** :
+- Par catégorie
+- Chaque document : nom clair, date de dépôt, bouton "Télécharger"
+- Documents en lecture seule
+
+### Section 5 — Message de clôture
+
+> "Votre dossier est désormais complet.
+> Les démarches liées au versement des aides sont en cours.
+> Vous pouvez retrouver l'ensemble des documents ci-dessous."
+
+## 4. Navigation post-clôture
+
+### Retour tableau de bord
+Bouton : **"Retour à mes dossiers"**
+
+### Gestion multi-dossiers
+Le client peut :
+- Consulter la liste de **tous ses dossiers**
+- Distinguer dossiers en cours vs clôturés
+- Accéder à chaque dossier individuellement
+
+## 5. Création nouveau dossier
+
+### Action disponible
+Sur le tableau de bord : **"Créer un nouveau dossier"**
+
+### Comportement
+- Création d'un nouveau dossier indépendant
+- Nouveau numéro de dossier
+- Reprise du parcours à l'étape 2
+- Aucun impact sur dossiers précédents
+
+## 6. Contraintes
+
+- Dossier clôturé :
+  - Consultable à tout moment
+  - Non modifiable
+- Documents accessibles sans limite de durée
+- Informations correspondent à l'état réel du dossier
+
+## 7. Notifications finales
+
+### Client
+- E-mail de clôture du dossier
+- Récapitulatif synthétique
+- Information sur les délais de versement
+
+### Admin
+- Notification : "Dossier clôturé – prêt pour versement des aides"
+
+## 8. API
+
+- `GET /api/dossiers/[id]/recap` - Récapitulatif complet
+- `GET /api/dossiers/[id]/documents/download-all` - Téléchargement groupé
+- `POST /api/admin/dossiers/[id]/finalize` - Clôture admin
+- `POST /api/dossiers` - Création nouveau dossier
 
 ---
 
-## Fonctionnalités Transverses Client
+# Types de travaux
 
-### Messagerie
-
-#### Bulle de chat flottante (style Intercom)
-- Icône flottante en bas à droite
-- Badge avec nombre de messages non lus
-- Click = ouverture panneau latéral
-- Conversation en temps réel avec le conseiller
-- Indicateur "conseiller en train d'écrire..."
-- Horodatage des messages
-- Pièces jointes possibles
-
-#### Page Messages complète
-- Historique complet des conversations
-- Recherche dans les messages
-- Filtres par date, par statut
-- Export de la conversation
-
-### Documents
-
-#### Bibliothèque documentaire
-- Liste de tous les documents du dossier
-- Filtres par catégorie, statut, date
-- Prévisualisation inline
-- Téléchargement individuel ou groupé
-- Indicateur de document manquant
-
-#### Catégories de documents
-- Administratifs (mandat, attestations)
-- Techniques (devis, factures)
-- Justificatifs (RGE, photos)
-- Générés (récapitulatifs, rapports)
-
-### Profil
-
-- Modification des informations personnelles
-- Changement de mot de passe
-- Préférences de notification:
-  - Email
-  - Push (futur)
-  - SMS (futur)
-- Historique des connexions
-
-### Support / FAQ
-
-- FAQ dynamique par étape
-- Questions fréquentes
-- Contact support
-- Documentation d'aide
-- Tutoriels vidéo (liens externes)
+```typescript
+const WORK_TYPES = [
+  { code: 'ISOLATION', label: 'Isolation / Menuiseries' },
+  { code: 'HEATING', label: 'Chauffage performant' },
+  { code: 'HOT_WATER', label: 'Eau chaude sanitaire' },
+  { code: 'VENTILATION', label: 'Ventilation' },
+] as const
+```
 
 ---
 
-## Exigences Real-Time
-
-### Notifications
-
-#### Types de notifications
-- `STEP_VALIDATED` - Étape validée
-- `STEP_BLOCKED` - Étape bloquée avec motif
-- `DOCUMENT_REQUIRED` - Document demandé
-- `MESSAGE_RECEIVED` - Nouveau message
-- `DEADLINE_REMINDER` - Rappel d'échéance
-
-#### Comportement
-- Popup toast en temps réel
-- Son de notification (désactivable)
-- Badge sur l'icône notifications
-- Liste dans la page dédiée
-- Marquage lu/non lu
-
-### WebSocket / SSE
-
-Utiliser Server-Sent Events pour:
-- Mise à jour du statut des étapes
-- Nouveaux messages
-- Notifications push
-- Indicateur de présence conseiller
-
-### Micro-interactions
-
-- Animations de validation (checkmark animé)
-- Progress bar animée
-- Skeleton loading
-- Transitions fluides entre étapes
-- Feedback haptique sur mobile (vibration)
-
----
-
-## Statuts des Étapes
+# Statuts des Étapes
 
 ```typescript
 enum StepStatus {
@@ -390,109 +828,7 @@ enum StepStatus {
 
 ---
 
-## Modèle de données (Prisma)
-
-Les entités principales sont:
-- `User` - Utilisateurs (clients et admins)
-- `Dossier` - Dossier de rénovation
-- `Step` - Instance d'étape pour un dossier
-- `StepTemplate` - Définition des étapes
-- `Document` - Documents uploadés
-- `Message` - Messages de la conversation
-- `Notification` - Notifications utilisateur
-- `MprHistory` - Historique des modifications MPR
-
----
-
-## Routes Principales
-
-### Client
-- `/dashboard` - Tableau de bord avec timeline
-- `/dossier/[id]` - Détail du dossier
-- `/dossier/[id]/etape/[code]` - Page d'une étape
-- `/messages` - Messagerie complète
-- `/documents` - Bibliothèque documentaire
-- `/notifications` - Centre de notifications
-- `/profil` - Paramètres du compte
-- `/aide` - FAQ et support
-
-### Admin
-- `/admin` - Dashboard admin
-- `/admin/clients` - Liste des clients
-- `/admin/clients/new` - Création client
-- `/admin/dossiers` - Liste des dossiers
-- `/admin/dossiers/[id]` - Gestion d'un dossier
-- `/admin/messages` - Messages à traiter
-
----
-
-## Conventions de Code
-
-### Fichiers
-- Components: `PascalCase.tsx`
-- Utils/hooks: `camelCase.ts`
-- Types: `types/index.ts` ou `types/[domain].ts`
-
-### Structure des composants
-```
-src/components/
-├── ui/           # Composants UI de base (Button, Card, Input...)
-├── layout/       # Sidebar, Header, Footer
-├── dashboard/    # Composants spécifiques dashboard
-├── dossier/      # Composants de gestion dossier
-├── admin/        # Composants admin
-└── shared/       # Composants partagés
-```
-
-### API Routes
-```
-src/app/api/
-├── auth/         # Login, logout, register
-├── dossiers/     # CRUD dossiers client
-├── admin/        # Routes admin uniquement
-├── documents/    # Upload, download
-├── messages/     # Messagerie
-└── notifications/ # Notifications
-```
-
----
-
-## Sécurité
-
-### Authentification
-- JWT stocké en httpOnly cookie
-- Expiration: 7 jours
-- Refresh token: non implémenté (TODO)
-
-### Autorisation
-- Middleware de vérification role
-- Isolation des données par clientId
-- Admin peut voir tous les dossiers
-- Client voit uniquement son dossier
-
-### Validation
-- Zod pour validation des inputs
-- Sanitization des uploads
-- Rate limiting (TODO)
-
----
-
-## Performance
-
-### Optimisations
-- React Server Components par défaut
-- Client components uniquement si interactivité
-- Images optimisées avec next/image
-- Lazy loading des composants lourds
-
-### Caching
-- Prisma query caching
-- Static generation pour FAQ/aide
-- ISR pour listes admin (TODO)
-
----
-
-## Comptes de Test
+# Comptes de Test
 
 ```
 Client: client@exemple.fr / client123
@@ -502,7 +838,7 @@ Conseiller: conseiller@kopro.fr / admin123
 
 ---
 
-## Commandes Utiles
+# Commandes Utiles
 
 ```bash
 # Développement
@@ -517,7 +853,4 @@ npm run db:studio    # Interface Prisma Studio
 # Build
 npm run build
 npm run start
-
-# Linting
-npm run lint
 ```

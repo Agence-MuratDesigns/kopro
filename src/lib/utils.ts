@@ -70,26 +70,45 @@ export const documentTypeLabels: Record<string, string> = {
 }
 
 export const categoryLabels: Record<string, string> = {
-  ELIGIBILITE: 'Éligibilité',
-  AUDIT: 'Audit',
-  DEVIS: 'Devis',
-  MPR_DEMANDE: 'MaPrimeRénov\'',
-  CEE_DEMANDE: 'CEE',
-  TRAVAUX: 'Travaux',
-  CONTROLE: 'Contrôle',
-  PAIEMENT: 'Paiement',
+  ADMIN_SETUP: 'Initialisation',
+  CLIENT_ACTION: 'Action client',
+  FINAL: 'Finalisation',
 }
 
 export const categoryColors: Record<string, string> = {
-  ELIGIBILITE: 'bg-purple-500',
-  AUDIT: 'bg-blue-500',
-  DEVIS: 'bg-cyan-500',
-  MPR_DEMANDE: 'bg-green-500',
-  CEE_DEMANDE: 'bg-emerald-500',
-  TRAVAUX: 'bg-orange-500',
-  CONTROLE: 'bg-yellow-500',
-  PAIEMENT: 'bg-teal-500',
+  ADMIN_SETUP: 'bg-purple-500',
+  CLIENT_ACTION: 'bg-blue-500',
+  FINAL: 'bg-green-500',
 }
+
+// Types de travaux disponibles
+export const WORK_TYPES = [
+  { code: 'ISOLATION', label: 'Isolation / Menuiseries' },
+  { code: 'HEATING', label: 'Chauffage performant' },
+  { code: 'HOT_WATER', label: 'Eau chaude sanitaire' },
+  { code: 'VENTILATION', label: 'Ventilation' },
+] as const
+
+export type WorkTypeCode = typeof WORK_TYPES[number]['code']
+
+// Regex pour validation MPR
+export const MPR_ID_REGEX = /^MPR-\d{4}[A-Z]{2}$/
+
+// Regex pour validation du nom/prénom
+export const NAME_REGEX = /^[A-Za-zÀ-ÖØ-öø-ÿ' -]{2,50}$/
+
+// Regex pour validation du mot de passe
+export const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/
+
+// Formats de fichiers acceptés
+export const ACCEPTED_FILE_TYPES = {
+  PDF: ['application/pdf'],
+  IMAGE: ['image/jpeg', 'image/png', 'image/jpg'],
+  ALL: ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'],
+}
+
+// Taille max des fichiers (10 Mo)
+export const MAX_FILE_SIZE = 10 * 1024 * 1024
 
 export function calculateProgress(steps: { status: string }[]): number {
   if (!steps || steps.length === 0) return 0

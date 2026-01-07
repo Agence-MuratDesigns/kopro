@@ -35,10 +35,15 @@ export function MprIdentifierForm({
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [isCertified, setIsCertified] = useState(false)
+  const [isEditing, setIsEditing] = useState(!currentMprId || mprStatus === 'REJECTED')
 
   // Validate MPR ID format: MPR-XXXXAB (4 digits + 2 uppercase letters)
   const mprIdRegex = /^MPR-\d{4}[A-Z]{2}$/
   const isValidFormat = mprIdRegex.test(mprId)
+
+  // Form can be submitted only if all conditions are met
+  const canSubmit = mprId.trim() && isValidFormat && isCertified
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -55,13 +60,18 @@ export function MprIdentifierForm({
       return
     }
 
+    if (!isCertified) {
+      setError('Veuillez certifier que l\'identifiant est correct avant d\'enregistrer.')
+      return
+    }
+
     setIsLoading(true)
 
     try {
       const response = await fetch(`/api/dossiers/${dossierId}/mpr-identifier`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mprId }),
+        body: JSON.stringify({ mprId: mprId.toUpperCase().trim(), certified: true }),
       })
 
       const data = await response.json()
@@ -71,7 +81,9 @@ export function MprIdentifierForm({
         return
       }
 
-      setSuccess('Votre identifiant a été soumis avec succès. Il sera vérifié par notre équipe.')
+      setSuccess('Identifiant enregistré. Votre dossier est en attente de validation.')
+      setIsEditing(false)
+      setIsCertified(false)
       router.refresh()
     } catch {
       setError('Erreur de connexion au serveur')
@@ -176,7 +188,7 @@ export function MprIdentifierForm({
         </div>
 
         {/* Form */}
-        {statusDisplay.canEdit ? (
+        {statusDisplay.canEdit && isEditing ? (
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
               <Alert variant="error" title="Erreur">
@@ -194,30 +206,18 @@ export function MprIdentifierForm({
               <label htmlFor="mprId" className="block text-sm font-medium text-gray-700 mb-2">
                 Identifiant MaPrimeRénov' *
               </label>
-              <div className="flex gap-3">
-                <Input
-                  id="mprId"
-                  value={mprId}
-                  onChange={(e) => {
-                    setMprId(e.target.value.toUpperCase())
-                    setError('')
-                    setSuccess('')
-                  }}
-                  placeholder="MPR-1234AB"
-                  disabled={isLoading}
-                  className="max-w-xs font-mono text-lg"
-                />
-                <Button type="submit" disabled={isLoading || !mprId.trim()}>
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Envoi...
-                    </>
-                  ) : (
-                    'Soumettre'
-                  )}
-                </Button>
-              </div>
+              <Input
+                id="mprId"
+                value={mprId}
+                onChange={(e) => {
+                  setMprId(e.target.value.toUpperCase())
+                  setError('')
+                  setSuccess('')
+                }}
+                placeholder="MPR-1234AB"
+                disabled={isLoading}
+                className="max-w-xs font-mono text-lg"
+              />
               {mprId && !isValidFormat && (
                 <p className="text-sm text-red-600 mt-2">
                   Format attendu : MPR-XXXXAB (4 chiffres + 2 lettres majuscules)
@@ -230,7 +230,54 @@ export function MprIdentifierForm({
                 </p>
               )}
             </div>
+
+            {/* Certification checkbox */}
+            <div className="p-4 bg-amber-50 border border-amber-100 rounded-lg">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isCertified}
+                  onChange={(e) => setIsCertified(e.target.checked)}
+                  disabled={isLoading}
+                  className="mt-1 h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                />
+                <span className="text-sm text-amber-800">
+                  Je certifie que cet identifiant est exact et correspond à mon dossier MaPrimeRénov'.
+                </span>
+              </label>
+            </div>
+
+            <Button
+              type="submit"
+              disabled={isLoading || !canSubmit}
+              className="w-full sm:w-auto"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Envoi en cours...
+                </>
+              ) : (
+                'Enregistrer mon identifiant'
+              )}
+            </Button>
           </form>
+        ) : statusDisplay.canEdit && !isEditing && currentMprId ? (
+          <div className="space-y-4">
+            <div className="p-4 bg-gray-50 rounded-lg">
+              <p className="text-sm text-gray-500 mb-1">Identifiant enregistré</p>
+              <p className="font-mono text-lg font-medium text-gray-900">{currentMprId}</p>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsEditing(true)
+                setIsCertified(false)
+              }}
+            >
+              Modifier mon identifiant
+            </Button>
+          </div>
         ) : (
           <div className="p-4 bg-gray-50 rounded-lg">
             <p className="text-sm text-gray-500 mb-1">Identifiant enregistré</p>
