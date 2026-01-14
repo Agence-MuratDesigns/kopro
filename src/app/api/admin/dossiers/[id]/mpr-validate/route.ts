@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireRole } from '@/lib/auth'
+import { sendEventToUser } from '@/app/api/realtime/events/route'
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -131,9 +132,24 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         })
       })
 
+      // Send real-time notification to client
+      sendEventToUser(dossier.clientId, 'notification', {
+        type: 'MPR_APPROVED',
+        title: 'Identifiant valide',
+        message: 'Votre identifiant MaPrimeRenov\' a ete verifie et valide.',
+      })
+
+      // Send step update event for real-time UI update
+      sendEventToUser(dossier.clientId, 'step_update', {
+        dossierId,
+        stepCode: 'IDENTIFIANT_MPR',
+        status: 'VALIDATED',
+        action: 'approved',
+      })
+
       return NextResponse.json({
         success: true,
-        message: 'Identifiant validé avec succès',
+        message: 'Identifiant valide avec succes',
       })
     } else {
       // REJECT
@@ -201,9 +217,25 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         })
       })
 
+      // Send real-time notification to client
+      sendEventToUser(dossier.clientId, 'notification', {
+        type: 'MPR_REJECTED',
+        title: 'Identifiant rejete',
+        message: `Votre identifiant a ete rejete : ${message}`,
+      })
+
+      // Send step update event for real-time UI update
+      sendEventToUser(dossier.clientId, 'step_update', {
+        dossierId,
+        stepCode: 'IDENTIFIANT_MPR',
+        status: 'REJECTED',
+        action: 'rejected',
+        message,
+      })
+
       return NextResponse.json({
         success: true,
-        message: 'Identifiant rejeté',
+        message: 'Identifiant rejete',
       })
     }
   } catch (error) {

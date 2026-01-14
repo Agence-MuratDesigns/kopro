@@ -1,13 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { verifyAuth } from '@/lib/auth'
+import { getSession } from '@/lib/auth'
 import { sendEventToUser } from '@/app/api/realtime/events/route'
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await verifyAuth()
+    const session = await getSession()
+    if (!session) {
+      return NextResponse.json({ error: 'Non autorise' }, { status: 401 })
+    }
+
+    // Get user details
+    const user = await prisma.user.findUnique({
+      where: { id: session.userId },
+      select: { id: true, firstName: true, lastName: true, role: true },
+    })
+
     if (!user) {
-      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+      return NextResponse.json({ error: 'Utilisateur non trouve' }, { status: 401 })
     }
 
     const searchParams = request.nextUrl.searchParams
@@ -56,9 +66,19 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await verifyAuth()
+    const session = await getSession()
+    if (!session) {
+      return NextResponse.json({ error: 'Non autorise' }, { status: 401 })
+    }
+
+    // Get user details
+    const user = await prisma.user.findUnique({
+      where: { id: session.userId },
+      select: { id: true, firstName: true, lastName: true, role: true },
+    })
+
     if (!user) {
-      return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
+      return NextResponse.json({ error: 'Utilisateur non trouve' }, { status: 401 })
     }
 
     const body = await request.json()

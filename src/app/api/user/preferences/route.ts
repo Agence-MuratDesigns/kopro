@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { verifyAuth } from '@/lib/auth'
+import { getSession } from '@/lib/auth'
 
 export async function PUT(request: NextRequest) {
   try {
-    const user = await verifyAuth()
-    if (!user) {
+    const session = await getSession()
+    if (!session) {
       return NextResponse.json(
-        { error: 'Non autorisé' },
+        { error: 'Non autorise' },
         { status: 401 }
       )
     }
+
+    const user = { id: session.userId }
 
     const body = await request.json()
     const { soundEnabled, emailNotifications, pushNotifications, preferredChannel } = body
@@ -55,13 +57,15 @@ export async function PUT(request: NextRequest) {
 
 export async function GET() {
   try {
-    const user = await verifyAuth()
-    if (!user) {
+    const session = await getSession()
+    if (!session) {
       return NextResponse.json(
-        { error: 'Non autorisé' },
+        { error: 'Non autorise' },
         { status: 401 }
       )
     }
+
+    const user = { id: session.userId }
 
     const userData = await prisma.user.findUnique({
       where: { id: user.id },
