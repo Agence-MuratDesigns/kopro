@@ -1,6 +1,7 @@
 'use client'
 
 import { RealtimeProvider } from '@/contexts/realtime-context'
+import { ChatProvider } from '@/contexts/chat-context'
 import { FloatingChat } from '@/components/chat/floating-chat'
 
 interface Dossier {
@@ -25,15 +26,17 @@ export function DashboardProviders({
 }: DashboardProvidersProps) {
   return (
     <RealtimeProvider userId={userId}>
-      {children}
-      {dossiers.length > 0 && (
-        <FloatingChat
-          userId={userId}
-          dossiers={dossiers}
-          unreadCount={unreadMessages}
-          soundEnabled={soundEnabled}
-        />
-      )}
+      <ChatProvider>
+        {children}
+        {dossiers.length > 0 && (
+          <FloatingChat
+            userId={userId}
+            dossiers={dossiers}
+            unreadCount={unreadMessages}
+            soundEnabled={soundEnabled}
+          />
+        )}
+      </ChatProvider>
     </RealtimeProvider>
   )
 }

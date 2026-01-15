@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -19,7 +20,7 @@ import {
   Clock,
   Award,
   ArrowLeft,
-  Plus,
+  Loader2,
 } from 'lucide-react'
 
 interface Document {
@@ -60,6 +61,9 @@ const workIcons: Record<string, React.ReactNode> = {
 }
 
 export function FinalRecap({ dossier, client, documents }: FinalRecapProps) {
+  const [downloadingDoc, setDownloadingDoc] = useState<string | null>(null)
+  const [downloadingAll, setDownloadingAll] = useState(false)
+
   const selectedWorks: string[] = dossier.selectedWorks
     ? JSON.parse(dossier.selectedWorks)
     : []
@@ -84,6 +88,54 @@ export function FinalRecap({ dossier, client, documents }: FinalRecapProps) {
   }
 
   const paymentStatus = getPaymentStatusDisplay()
+
+  const handleDownloadDocument = async (docId: string, docName: string) => {
+    setDownloadingDoc(docId)
+    try {
+      const response = await fetch(`/api/dossiers/${dossier.id}/documents/${docId}/download`)
+      if (!response.ok) {
+        throw new Error('Erreur lors du téléchargement')
+      }
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = docName
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (error) {
+      console.error('Download error:', error)
+      alert('Erreur lors du téléchargement du document')
+    } finally {
+      setDownloadingDoc(null)
+    }
+  }
+
+  const handleDownloadAll = async () => {
+    setDownloadingAll(true)
+    try {
+      const response = await fetch(`/api/dossiers/${dossier.id}/documents/download-all`)
+      if (!response.ok) {
+        throw new Error('Erreur lors du téléchargement')
+      }
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `Dossier_${dossier.reference}.zip`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (error) {
+      console.error('Download all error:', error)
+      alert('Erreur lors du téléchargement des documents')
+    } finally {
+      setDownloadingAll(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -253,10 +305,21 @@ export function FinalRecap({ dossier, client, documents }: FinalRecapProps) {
               <FileText className="h-5 w-5" />
               Documents du dossier
             </CardTitle>
-            <Button variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-2" />
-              Tout télécharger
-            </Button>
+            {documents.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadAll}
+                disabled={downloadingAll}
+              >
+                {downloadingAll ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4 mr-2" />
+                )}
+                Tout télécharger
+              </Button>
+            )}
           </div>
           <CardDescription>
             Consultez et téléchargez tous les documents de votre dossier
@@ -282,8 +345,17 @@ export function FinalRecap({ dossier, client, documents }: FinalRecapProps) {
                         </p>
                       </div>
                     </div>
-                    <Button variant="ghost" size="sm">
-                      <Download className="h-4 w-4" />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDownloadDocument(doc.id, doc.name)}
+                      disabled={downloadingDoc === doc.id}
+                    >
+                      {downloadingDoc === doc.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Download className="h-4 w-4" />
+                      )}
                     </Button>
                   </div>
                 ))}
@@ -313,8 +385,17 @@ export function FinalRecap({ dossier, client, documents }: FinalRecapProps) {
                         </p>
                       </div>
                     </div>
-                    <Button variant="ghost" size="sm">
-                      <Download className="h-4 w-4" />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDownloadDocument(doc.id, doc.name)}
+                      disabled={downloadingDoc === doc.id}
+                    >
+                      {downloadingDoc === doc.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Download className="h-4 w-4" />
+                      )}
                     </Button>
                   </div>
                 ))}
@@ -327,17 +408,11 @@ export function FinalRecap({ dossier, client, documents }: FinalRecapProps) {
       </Card>
 
       {/* Navigation */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t">
+      <div className="flex items-center justify-start pt-4 border-t">
         <Link href="/dashboard">
           <Button variant="outline">
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Retour à mes dossiers
-          </Button>
-        </Link>
-        <Link href="/dashboard/nouveau-dossier">
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            Créer un nouveau dossier
+            Retour au tableau de bord
           </Button>
         </Link>
       </div>

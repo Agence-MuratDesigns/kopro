@@ -1,16 +1,14 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
 import { cn, formatDateTime } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
 import { useSoundNotifications } from '@/hooks/use-sound'
+import { useChat } from '@/contexts/chat-context'
 import {
   MessageSquare,
   X,
   Send,
   Loader2,
-  ChevronDown,
   CheckCircle,
   AlertCircle,
   Info,
@@ -50,8 +48,7 @@ export function FloatingChat({
   unreadCount = 0,
   soundEnabled = true,
 }: FloatingChatProps) {
-  const router = useRouter()
-  const [isOpen, setIsOpen] = useState(false)
+  const { isOpen, openChat, closeChat, toggleChat } = useChat()
   const [messages, setMessages] = useState<Message[]>(initialMessages)
   const [newMessage, setNewMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -160,9 +157,9 @@ export function FloatingChat({
     }
   }
 
-  const toggleOpen = () => {
+  const handleToggle = () => {
     playClick()
-    setIsOpen(!isOpen)
+    toggleChat()
     if (!isOpen) {
       setLocalUnreadCount(0)
     }
@@ -189,7 +186,7 @@ export function FloatingChat({
     <>
       {/* Floating button */}
       <button
-        onClick={toggleOpen}
+        onClick={handleToggle}
         className={cn(
           'fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full shadow-lg transition-all duration-300',
           'flex items-center justify-center',
@@ -226,7 +223,7 @@ export function FloatingChat({
             </div>
           </div>
           <button
-            onClick={toggleOpen}
+            onClick={closeChat}
             className="p-2 hover:bg-white/20 rounded-full transition-colors"
           >
             <X className="h-5 w-5" />

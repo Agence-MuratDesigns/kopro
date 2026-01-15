@@ -47,9 +47,9 @@ export const stepStatusLabels: Record<string, string> = {
 
 export const stepStatusColors: Record<string, string> = {
   LOCKED: 'bg-gray-100 text-gray-500',
-  AVAILABLE: 'bg-blue-100 text-blue-700',
-  IN_PROGRESS: 'bg-yellow-100 text-yellow-700',
-  PENDING_VALIDATION: 'bg-purple-100 text-purple-700',
+  AVAILABLE: 'bg-primary-100 text-primary-700',
+  IN_PROGRESS: 'bg-primary-100 text-primary-700',
+  PENDING_VALIDATION: 'bg-accent-light text-accent',
   VALIDATED: 'bg-green-100 text-green-700',
   BLOCKED: 'bg-red-100 text-red-700',
 }

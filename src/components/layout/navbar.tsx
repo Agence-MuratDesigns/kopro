@@ -10,7 +10,6 @@ import {
   FileText,
   MessageSquare,
   Bell,
-  User,
   LogOut,
   Menu,
   X,
@@ -18,6 +17,7 @@ import {
   Users,
   BarChart3,
 } from 'lucide-react'
+import { SoundToggle } from './sound-toggle'
 
 interface NavbarProps {
   user: {
@@ -32,7 +32,7 @@ interface NavbarProps {
 export function Navbar({ user }: NavbarProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const pathname = usePathname()
-  const isAdmin = user.role === 'ADMIN' || user.role === 'ADVISOR'
+  const isAdmin = user.role === 'ADMIN'
 
   const clientLinks = [
     { href: '/dashboard', label: 'Tableau de bord', icon: Home },
@@ -52,16 +52,17 @@ export function Navbar({ user }: NavbarProps) {
   const links = isAdmin ? adminLinks : clientLinks
 
   return (
-    <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
+    <nav className="bg-white/80 backdrop-blur-sm border-b border-[var(--light-purple)] sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           {/* Logo */}
           <div className="flex items-center">
-            <Link href={isAdmin ? '/admin' : '/dashboard'} className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-lg">K</span>
-              </div>
-              <span className="text-xl font-bold text-gray-900">KOPRO</span>
+            <Link href={isAdmin ? '/admin' : '/dashboard'} className="flex items-center group">
+              <img
+                src="/logo.svg"
+                alt="KOPRO"
+                className="h-8 transition-transform duration-200 group-hover:scale-95"
+              />
             </Link>
           </div>
 
@@ -75,10 +76,10 @@ export function Navbar({ user }: NavbarProps) {
                   key={link.href}
                   href={link.href}
                   className={cn(
-                    'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                    'flex items-center gap-2 px-3 py-2 rounded-full text-sm font-medium transition-all duration-200',
                     isActive
-                      ? 'bg-primary-50 text-primary-700'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                      ? 'bg-[var(--accent)] text-white shadow-md'
+                      : 'text-[var(--dark)] hover:bg-[var(--light-purple)] hover:text-[var(--accent)]'
                   )}
                 >
                   <Icon className="h-4 w-4" />
@@ -90,11 +91,12 @@ export function Navbar({ user }: NavbarProps) {
 
           {/* User Menu */}
           <div className="hidden md:flex items-center gap-4">
+            <SoundToggle />
             <div className="text-right">
-              <p className="text-sm font-medium text-gray-900">
+              <p className="text-sm font-medium text-[var(--dark)]">
                 {user.firstName} {user.lastName}
               </p>
-              <p className="text-xs text-gray-500">{user.email}</p>
+              <p className="text-xs text-[var(--grey)]">{user.email}</p>
             </div>
             <form action="/api/auth/logout" method="POST">
               <Button variant="ghost" size="sm" type="submit">
@@ -108,7 +110,7 @@ export function Navbar({ user }: NavbarProps) {
           <div className="flex items-center md:hidden">
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="p-2 rounded-lg text-gray-600 hover:bg-gray-100"
+              className="p-2 rounded-full text-[var(--dark)] hover:bg-[var(--light-purple)] transition-colors"
             >
               {isMobileMenuOpen ? (
                 <X className="h-6 w-6" />
@@ -122,7 +124,7 @@ export function Navbar({ user }: NavbarProps) {
 
       {/* Mobile menu */}
       {isMobileMenuOpen && (
-        <div className="md:hidden border-t border-gray-200">
+        <div className="md:hidden border-t border-[var(--light-purple)] bg-white/95 backdrop-blur-sm">
           <div className="px-4 py-3 space-y-1">
             {links.map((link) => {
               const Icon = link.icon
@@ -133,10 +135,10 @@ export function Navbar({ user }: NavbarProps) {
                   href={link.href}
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={cn(
-                    'flex items-center gap-3 px-3 py-2 rounded-lg text-base font-medium',
+                    'flex items-center gap-3 px-4 py-3 rounded-xl text-base font-medium transition-all duration-200',
                     isActive
-                      ? 'bg-primary-50 text-primary-700'
-                      : 'text-gray-600 hover:bg-gray-100'
+                      ? 'bg-[var(--accent)] text-white shadow-md'
+                      : 'text-[var(--dark)] hover:bg-[var(--light-purple)]'
                   )}
                 >
                   <Icon className="h-5 w-5" />
@@ -144,17 +146,17 @@ export function Navbar({ user }: NavbarProps) {
                 </Link>
               )
             })}
-            <hr className="my-2" />
-            <div className="px-3 py-2">
-              <p className="text-sm font-medium text-gray-900">
+            <hr className="my-2 border-[var(--light-purple)]" />
+            <div className="px-4 py-2">
+              <p className="text-sm font-medium text-[var(--dark)]">
                 {user.firstName} {user.lastName}
               </p>
-              <p className="text-xs text-gray-500">{user.email}</p>
+              <p className="text-xs text-[var(--grey)]">{user.email}</p>
             </div>
             <form action="/api/auth/logout" method="POST">
               <button
                 type="submit"
-                className="flex items-center gap-3 px-3 py-2 rounded-lg text-base font-medium text-red-600 hover:bg-red-50 w-full"
+                className="flex items-center gap-3 px-4 py-3 rounded-xl text-base font-medium text-[var(--required)] hover:bg-red-50 w-full transition-colors"
               >
                 <LogOut className="h-5 w-5" />
                 Déconnexion

@@ -13,7 +13,7 @@ interface Props {
 
 export default async function AdminMessagesPage({ searchParams }: Props) {
   const params = await searchParams
-  const user = await requireRole(['ADMIN', 'ADVISOR'])
+  const user = await requireRole(['ADMIN'])
 
   // Get dossiers with unread messages
   const dossiers = await prisma.dossier.findMany({
@@ -28,7 +28,7 @@ export default async function AdminMessagesPage({ searchParams }: Props) {
       _count: {
         select: {
           messages: {
-            where: { isRead: false, isFromClient: true },
+            where: { isRead: false, messageType: 'CLIENT' },
           },
         },
       },
@@ -62,7 +62,7 @@ export default async function AdminMessagesPage({ searchParams }: Props) {
       where: {
         dossierId: selectedDossierId,
         isRead: false,
-        isFromClient: true,
+        messageType: 'CLIENT',
       },
       data: { isRead: true },
     })
@@ -137,7 +137,7 @@ export default async function AdminMessagesPage({ searchParams }: Props) {
                 </div>
               ) : (
                 messages.map(message => {
-                  const isFromClient = message.isFromClient
+                  const isFromClient = message.messageType === 'CLIENT'
 
                   return (
                     <div
@@ -153,7 +153,7 @@ export default async function AdminMessagesPage({ searchParams }: Props) {
                       >
                         <div className="flex items-center gap-2 mb-1">
                           <span className={`text-xs font-medium ${isFromClient ? 'text-gray-500' : 'text-primary-100'}`}>
-                            {message.sender.firstName} {message.sender.lastName}
+                            {message.sender?.firstName} {message.sender?.lastName}
                           </span>
                           {isFromClient && (
                             <Badge variant="default" className="text-xs py-0">

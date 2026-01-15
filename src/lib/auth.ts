@@ -11,7 +11,7 @@ const JWT_SECRET = new TextEncoder().encode(
 export interface JWTPayload {
   userId: string
   email: string
-  role: 'CLIENT' | 'ADVISOR' | 'ADMIN'
+  role: 'CLIENT' | 'ADMIN'
   exp?: number
 }
 
@@ -26,7 +26,7 @@ export async function createToken(payload: Omit<JWTPayload, 'exp'>): Promise<str
 export async function verifyToken(token: string): Promise<JWTPayload | null> {
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET)
-    return payload as JWTPayload
+    return payload as unknown as JWTPayload
   } catch {
     return null
   }
@@ -112,11 +112,32 @@ export async function requireAuth() {
   return user
 }
 
-export async function requireRole(roles: ('CLIENT' | 'ADVISOR' | 'ADMIN')[]) {
+export async function requireRole(roles: ('CLIENT' | 'ADMIN')[]) {
   const user = await requireAuth()
   if (!roles.includes(user.role as any)) {
     redirect('/unauthorized')
   }
+  return user
+}
+
+// Fonction pour vérifier l'authentification dans les API routes (sans redirection)
+export async function verifyAuth() {
+  const session = await getSession()
+  if (!session) return null
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.userId },
+    select: {
+      id: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      phone: true,
+      role: true,
+      avatarUrl: true,
+    },
+  })
+
   return user
 }
 

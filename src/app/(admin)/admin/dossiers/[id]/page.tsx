@@ -10,6 +10,9 @@ import { formatDate, formatCurrency, stepStatusLabels, stepStatusColors, documen
 import { AdminStepActions } from './admin-step-actions'
 import { AdminDocumentActions } from './admin-document-actions'
 import { AdminMprValidation } from './admin-mpr-validation'
+import { AdminQuotesValidation } from './admin-quotes-validation'
+import { AdminInvoicesValidation } from './admin-invoices-validation'
+import { AdminFinalizationPanel } from '@/components/admin/admin-finalization-panel'
 import Link from 'next/link'
 import {
   ArrowLeft,
@@ -25,6 +28,7 @@ import {
   X,
   Clock,
   Key,
+  Download,
 } from 'lucide-react'
 
 interface Props {
@@ -33,7 +37,7 @@ interface Props {
 
 export default async function AdminDossierPage({ params }: Props) {
   const { id } = await params
-  await requireRole(['ADMIN', 'ADVISOR'])
+  await requireRole(['ADMIN'])
   const dossier = await getDossierWithSteps(id)
 
   if (!dossier) {
@@ -96,6 +100,20 @@ export default async function AdminDossierPage({ params }: Props) {
       {dossier.mprStatus === 'PENDING_REVIEW' && (
         <Alert variant="warning" title="Identifiant MaPrimeRénov' à valider">
           Le client a soumis son identifiant MaPrimeRénov' : <strong>{dossier.mprId}</strong>
+        </Alert>
+      )}
+
+      {/* Quotes Alert */}
+      {dossier.quotesStatus === 'PENDING_REVIEW' && (
+        <Alert variant="warning" title="Devis à vérifier">
+          Le client a soumis ses devis. Vérifiez-les et validez ou rejetez-les.
+        </Alert>
+      )}
+
+      {/* Invoices Alert */}
+      {dossier.invoicesStatus === 'PENDING_REVIEW' && (
+        <Alert variant="warning" title="Factures à vérifier">
+          Le client a soumis ses factures finales. Vérifiez-les et validez ou rejetez-les.
         </Alert>
       )}
 
@@ -233,6 +251,46 @@ export default async function AdminDossierPage({ params }: Props) {
               ...h,
               createdAt: h.createdAt.toISOString(),
             })) || []}
+            clientName={`${dossier.client.firstName} ${dossier.client.lastName}`}
+          />
+
+          {/* Quotes Validation */}
+          <AdminQuotesValidation
+            dossierId={dossier.id}
+            quotesStatus={dossier.quotesStatus}
+            quotesSubmittedAt={dossier.quotesSubmittedAt?.toISOString() || null}
+            quotesReviewMessage={dossier.quotesReviewMessage}
+            documents={dossier.documents
+              .filter(d => d.type === 'DEVIS')
+              .map(d => ({
+                id: d.id,
+                name: d.name,
+                workType: d.workType,
+                status: d.status,
+                filePath: d.filePath,
+                uploadedAt: d.uploadedAt.toISOString(),
+              }))}
+            selectedWorks={dossier.selectedWorks ? JSON.parse(dossier.selectedWorks as string) : []}
+            clientName={`${dossier.client.firstName} ${dossier.client.lastName}`}
+          />
+
+          {/* Invoices Validation */}
+          <AdminInvoicesValidation
+            dossierId={dossier.id}
+            invoicesStatus={dossier.invoicesStatus}
+            invoicesSubmittedAt={dossier.invoicesSubmittedAt?.toISOString() || null}
+            invoicesReviewMessage={dossier.invoicesReviewMessage}
+            documents={dossier.documents
+              .filter(d => d.type === 'FACTURE')
+              .map(d => ({
+                id: d.id,
+                name: d.name,
+                workType: d.workType,
+                status: d.status,
+                filePath: d.filePath,
+                uploadedAt: d.uploadedAt.toISOString(),
+              }))}
+            selectedWorks={dossier.selectedWorks ? JSON.parse(dossier.selectedWorks as string) : []}
             clientName={`${dossier.client.firstName} ${dossier.client.lastName}`}
           />
 
@@ -384,6 +442,21 @@ export default async function AdminDossierPage({ params }: Props) {
               )}
             </CardContent>
           </Card>
+
+          {/* Finalization Panel */}
+          <AdminFinalizationPanel
+            dossierId={dossier.id}
+            dossierReference={dossier.reference}
+            currentStatus={dossier.status}
+            allStepsValidated={dossier.steps.filter(s => s.template.code !== 'FINAL_RECAP').every(s => s.status === 'VALIDATED')}
+            totalWorksAmount={dossier.totalWorksAmount}
+            mprAmount={dossier.mprAmount}
+            ceeAmount={dossier.ceeAmount}
+            paymentStatus={dossier.paymentStatus || 'PENDING'}
+            mprPaidAmount={dossier.mprPaidAmount}
+            ceePaidAmount={dossier.ceePaidAmount}
+            isClosable={dossier.steps.filter(s => s.template.code !== 'FINAL_RECAP').every(s => s.status === 'VALIDATED') && dossier.status !== 'CLOTURE'}
+          />
         </div>
       </div>
     </div>

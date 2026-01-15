@@ -6,7 +6,7 @@ import bcrypt from 'bcryptjs'
 // GET - List all clients
 export async function GET() {
   try {
-    const user = await requireRole(['ADMIN', 'ADVISOR'])
+    const user = await requireRole(['ADMIN'])
 
     const clients = await prisma.user.findMany({
       where: { role: 'CLIENT' },
@@ -46,7 +46,7 @@ export async function GET() {
 // POST - Create new client with dossier
 export async function POST(request: NextRequest) {
   try {
-    const admin = await requireRole(['ADMIN', 'ADVISOR'])
+    const admin = await requireRole(['ADMIN'])
 
     const body = await request.json()
     const { firstName, lastName, email, phone, password } = body

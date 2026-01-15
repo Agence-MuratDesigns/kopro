@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth'
+import { notifyAdminsOfClientAction } from '@/lib/realtime'
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Find the MPR step
-    const mprStep = dossier.steps.find(s => s.template.code === 'IDENTIFIANT_MPR')
+    const mprStep = dossier.steps.find(s => s.template.code === 'MPR_IDENTIFIER')
     if (!mprStep) {
       return NextResponse.json(
         { error: 'Étape de l\'identifiant MPR non trouvée' },
@@ -99,7 +100,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
       // Create notification for admins
       const admins = await tx.user.findMany({
-        where: { role: { in: ['ADMIN', 'ADVISOR'] } },
+        where: { role: { in: ['ADMIN'] } },
       })
 
       for (const admin of admins) {
@@ -124,6 +125,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           details: `Identifiant MPR soumis : ${mprId}`,
         },
       })
+    })
+
+    // Notify admins in real-time
+    notifyAdminsOfClientAction('mpr_submitted', {
+      dossierId,
+      clientName: `${user.firstName} ${user.lastName}`,
+      message: `Nouvel identifiant MPR soumis : ${mprId}`,
     })
 
     return NextResponse.json({

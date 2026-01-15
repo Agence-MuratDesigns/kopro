@@ -2,7 +2,7 @@
 
 ## Vue d'ensemble
 
-KOPRO est une application SaaS de suivi des dossiers MaPrimeRénov' (MPR) et Certificats d'Économies d'Énergie (CEE) pour les particuliers accompagnés par un conseiller Mon Accompagnateur Rénov' agréé.
+KOPRO est une application SaaS de suivi des dossiers MaPrimeRénov' (MPR) et Certificats d'Économies d'Énergie (CEE) pour les particuliers. Chaque client a un seul dossier, géré par un administrateur unique.
 
 ### Stack Technique
 
@@ -24,7 +24,7 @@ Le parcours client est divisé en **8 étapes séquentielles**. Chaque étape do
 # ÉTAPE 01 — Création du compte client par l'administrateur
 
 **Code**: `CLIENT_CREATION`
-**Acteur**: Admin/Conseiller uniquement
+**Acteur**: Admin uniquement
 **Catégorie**: `ADMIN_SETUP`
 
 ## 1. Contexte et objectif
@@ -45,7 +45,7 @@ Objectifs :
 ### Bouton d'action
 Libellé : **"Ajouter un client"**
 
-- Accessible uniquement aux profils autorisés (ADMIN, ADVISOR)
+- Accessible uniquement aux administrateurs (ADMIN)
 - Au clic : ouverture d'un formulaire dédié
 - Aucun dossier créé tant que le formulaire n'est pas validé
 
@@ -670,7 +670,7 @@ Permettre au client de :
 
 ---
 
-# ÉTAPE 08 — Récapitulatif final, clôture et accès multi-dossiers
+# ÉTAPE 08 — Récapitulatif final et clôture
 
 **Code**: `FINAL_RECAP`
 **Acteur**: Admin finalise, Client consulte
@@ -684,7 +684,6 @@ Buts :
 - Récapituler l'ensemble des informations administratives
 - Permettre de consulter et télécharger tous les documents
 - Informer sur l'état du versement des aides
-- Offrir un point d'entrée vers la gestion de **nouveaux dossiers**
 
 **Cette étape n'est pas bloquante et reste accessible après clôture.**
 
@@ -754,26 +753,9 @@ Buts :
 ## 4. Navigation post-clôture
 
 ### Retour tableau de bord
-Bouton : **"Retour à mes dossiers"**
+Bouton : **"Retour au tableau de bord"**
 
-### Gestion multi-dossiers
-Le client peut :
-- Consulter la liste de **tous ses dossiers**
-- Distinguer dossiers en cours vs clôturés
-- Accéder à chaque dossier individuellement
-
-## 5. Création nouveau dossier
-
-### Action disponible
-Sur le tableau de bord : **"Créer un nouveau dossier"**
-
-### Comportement
-- Création d'un nouveau dossier indépendant
-- Nouveau numéro de dossier
-- Reprise du parcours à l'étape 2
-- Aucun impact sur dossiers précédents
-
-## 6. Contraintes
+## 5. Contraintes
 
 - Dossier clôturé :
   - Consultable à tout moment
@@ -781,7 +763,7 @@ Sur le tableau de bord : **"Créer un nouveau dossier"**
 - Documents accessibles sans limite de durée
 - Informations correspondent à l'état réel du dossier
 
-## 7. Notifications finales
+## 6. Notifications finales
 
 ### Client
 - E-mail de clôture du dossier
@@ -791,12 +773,11 @@ Sur le tableau de bord : **"Créer un nouveau dossier"**
 ### Admin
 - Notification : "Dossier clôturé – prêt pour versement des aides"
 
-## 8. API
+## 7. API
 
 - `GET /api/dossiers/[id]/recap` - Récapitulatif complet
 - `GET /api/dossiers/[id]/documents/download-all` - Téléchargement groupé
 - `POST /api/admin/dossiers/[id]/finalize` - Clôture admin
-- `POST /api/dossiers` - Création nouveau dossier
 
 ---
 
@@ -833,8 +814,260 @@ enum StepStatus {
 ```
 Client: client@exemple.fr / client123
 Admin: admin@kopro.fr / admin123
-Conseiller: conseiller@kopro.fr / admin123
 ```
+
+---
+
+# Interface Client
+
+## Navigation (Sidebar)
+
+L'ordre des éléments de la sidebar côté client :
+
+1. **Accueil** - Tableau de bord principal avec progression et activités récentes
+2. **Mon dossier** - Détail du dossier avec formulaires d'étapes (badge de notification si action requise)
+3. **Mon profil** - Informations personnelles, modification email/mot de passe
+4. **Aide & support** - Contact et FAQ
+
+## Notifications & Sons
+
+- **TopBar fixe** en haut à droite de l'écran (visible sur toutes les pages)
+- Contient : icône Son (toggle) + icône Cloche (notifications)
+- Dropdown notifications avec liste et bouton "Tout marquer comme lu"
+- Pas d'onglet notifications séparé
+
+## Chat / Messagerie
+
+- **Bulle flottante** en bas à droite
+- S'ouvre/se ferme au clic sur le bouton ou via "Envoyer un message"
+- Pas de page messages séparée
+
+## Activités Récentes
+
+Les libellés sont formulés de manière conviviale pour le client :
+
+| Code | Libellé affiché |
+|------|-----------------|
+| `CLIENT_CREATED` | Bienvenue sur KOPRO |
+| `LOGIN` | Connexion à votre espace |
+| `MPR_ID_SUBMITTED` | Identifiant MPR enregistré |
+| `MPR_ID_VALIDATED` | Identifiant MPR validé |
+| `MPR_ID_REJECTED` | Identifiant MPR à corriger |
+| `MANDATE_SUBMITTED` | Mandat envoyé |
+| `MANDATE_VALIDATED` | Mandat validé |
+| `WORKS_SELECTED` | Travaux sélectionnés |
+| `QUOTES_SUBMITTED` | Devis envoyés |
+| `QUOTES_VALIDATED` | Devis validés |
+| `WORK_STARTED` | Début des travaux signalé |
+| `INVOICES_SUBMITTED` | Factures envoyées |
+| `INVOICES_VALIDATED` | Factures validées |
+| `DOSSIER_FINALIZED` | Dossier finalisé |
+| `STEP_VALIDATED` | Votre étape a été validée |
+| `STEP_REJECTED` | Une correction est nécessaire |
+| `DOCUMENT_UPLOAD` | Document ajouté |
+| `DOCUMENT_REJECTED` | Document à remplacer |
+| `MESSAGE_SENT` | Message envoyé |
+| `MESSAGE_RECEIVED` | Nouveau message reçu |
+| `PROFILE_UPDATE` | Profil mis à jour |
+| `PASSWORD_CHANGED` | Mot de passe modifié |
+| `EMAIL_CHANGED` | Adresse email modifiée |
+
+---
+
+# Design System UI/UX
+
+## Palette de Couleurs
+
+### Variables CSS (globals.css)
+
+```css
+:root {
+  --accent: #7645fb;        /* Violet principal */
+  --accent-2: #fba045;      /* Orange accent */
+  --light-cream: #fafbfd;   /* Fond clair */
+  --dark: #212121;          /* Texte foncé */
+  --white: #ffffff;
+  --required: #f16161;      /* Rouge erreur/requis */
+  --grey: #bcbcbc;          /* Gris secondaire */
+  --light-purple: #e6ddff;  /* Violet clair */
+  --success: #1cc562;       /* Vert succès */
+}
+```
+
+### Tailwind Config (couleurs)
+
+```typescript
+colors: {
+  primary: {
+    50: '#f5f2ff',
+    100: '#ebe5ff',
+    200: '#d9ccff',
+    300: '#bea6ff',
+    400: '#9f73ff',
+    500: '#8347ff',
+    600: '#7645fb',  // Couleur principale
+    700: '#6225e6',
+    800: '#521ec2',
+    900: '#451b9e',
+    950: '#290d6b',
+  },
+  accent: {
+    DEFAULT: '#7645fb',
+    light: '#e6ddff',
+    orange: '#fba045',
+  },
+  kopro: {
+    cream: '#fafbfd',
+    dark: '#212121',
+    required: '#f16161',
+    grey: '#bcbcbc',
+    purple: '#e6ddff',
+    success: '#1cc562',
+  },
+}
+```
+
+## Typographie
+
+- **Police principale** : Poppins (Google Fonts)
+- **Poids disponibles** : 300, 400, 500, 600, 700
+
+## Composants de Base
+
+### Boutons (btn-*)
+
+- `btn-primary` : Violet avec ombre, arrondi pill (8em)
+- `btn-secondary` : Fond violet clair, texte violet
+- `btn-outline` : Bordure violet, fond transparent
+- `btn-ghost` : Sans fond, texte foncé
+- `btn-danger` : Rouge pour actions destructives
+
+Comportement au survol : scale(0.95) avec transition
+
+### Inputs (input-field)
+
+- Pas de bordure visible
+- Ombres douces (box-shadow)
+- Focus : anneau violet clair
+- Erreur : anneau rouge
+
+### Cards (card)
+
+- Fond blanc, coins arrondis (2xl)
+- Bordure subtile violet clair
+- Ombre au survol
+
+## Layout Dashboard
+
+### Structure
+
+```
+┌─────────────────────────────────────────────────┐
+│ [TopBar: Son + Notifications]          (fixe)  │
+├──────────┬──────────────────────────────────────┤
+│          │                                      │
+│ Sidebar  │           Main Content               │
+│ (fixe)   │                                      │
+│          │                                      │
+│  Logo    │                                      │
+│  Nav     │                                      │
+│  ...     │                                      │
+│  User    │                                      │
+│          │                                      │
+└──────────┴──────────────────────────────────────┘
+│         [Logo Watermark 5%]           (fond)   │
+└─────────────────────────────────────────────────┘
+```
+
+### Background
+
+- Gradient : `linear-gradient(180deg, white, hsla(256.15deg, 95.79%, 62.75%, 0.12))`
+- Logo watermark en bas à droite (opacity 5%)
+
+### Sidebar
+
+- Largeur : 72 (étendu) / 20 (replié)
+- Logo KOPRO : h-10
+- Navigation avec icônes dans des carrés arrondis
+- Badge notification rouge (`bg-kopro-required`)
+- Profil utilisateur en bas avec avatar et badge vérifié
+
+### TopBar (position fixe en haut à droite)
+
+- Icône Son (toggle)
+- Icône Cloche (notifications dropdown)
+- Visible sur toutes les pages du dashboard
+
+## Timeline de Progression
+
+### Couleurs des étapes
+
+| Status | Couleur cercle | Animation |
+|--------|----------------|-----------|
+| VALIDATED | `bg-kopro-success` (vert) | - |
+| IN_PROGRESS | `bg-accent` (violet) | `animate-pulse-soft` |
+| AVAILABLE | `bg-accent` (violet) | `animate-pulse-soft` |
+| PENDING_VALIDATION | `bg-accent` (violet) | `animate-pulse-soft` |
+| BLOCKED | `bg-kopro-required` (rouge) | - |
+| LOCKED | `bg-gray-300` | - |
+
+### Ligne de connexion
+
+- Étapes validées : `bg-kopro-success`
+- Autres : `bg-gray-200`
+
+## Sons (Web Audio API)
+
+### Types de sons disponibles
+
+- `click` : Son subtil au clic (boutons, liens)
+- `message` : Nouveau message reçu
+- `notification` : Notification
+- `success` : Action réussie
+- `error` : Erreur
+
+### Utilisation
+
+```typescript
+import { useSoundToggle, useSound } from '@/hooks/use-sound'
+
+const { soundEnabled } = useSoundToggle()
+const { play } = useSound({ enabled: soundEnabled })
+
+// Jouer un son
+play('click')
+```
+
+### Composants avec sons intégrés
+
+- `<Button>` : Son de clic automatique (désactivable via `playSound={false}`)
+- Sidebar : Sons sur les liens de navigation
+
+## Animations CSS
+
+```css
+.animate-fade-in     /* Fade + translateY */
+.animate-scale-in    /* Scale de 0.95 à 1 */
+.animate-slide-up    /* Slide de bas en haut */
+.animate-pulse-soft  /* Pulsation douce (opacity) */
+.animate-bounce-soft /* Rebond léger */
+.animate-float       /* Flottement */
+```
+
+## Fichiers Clés UI
+
+| Fichier | Description |
+|---------|-------------|
+| `src/app/globals.css` | Variables CSS, classes utilitaires |
+| `tailwind.config.ts` | Configuration couleurs, fonts, ombres |
+| `src/components/ui/button.tsx` | Composant Button avec sons |
+| `src/components/ui/input.tsx` | Composant Input stylé |
+| `src/components/ui/card.tsx` | Composant Card |
+| `src/components/layout/sidebar.tsx` | Sidebar avec navigation |
+| `src/components/layout/top-bar.tsx` | Barre supérieure (son + notifications) |
+| `src/hooks/use-sound.ts` | Hook pour les sons |
+| `src/components/dashboard/horizontal-timeline.tsx` | Timeline horizontale |
+| `src/components/dashboard/step-timeline.tsx` | Timeline détaillée verticale |
 
 ---
 

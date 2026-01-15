@@ -104,7 +104,7 @@ export function ActionRequiredBanner({
             </div>
           </div>
           <Link href={`/dossier/${dossierId}/etape/${stepCode}`}>
-            <Button variant="destructive" className="whitespace-nowrap">
+            <Button variant="danger" className="whitespace-nowrap">
               Corriger maintenant
               <ArrowRight className="h-4 w-4 ml-2" />
             </Button>

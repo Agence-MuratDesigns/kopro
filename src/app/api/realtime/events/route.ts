@@ -1,37 +1,6 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-
-// Store for active connections
-const connections = new Map<string, Set<ReadableStreamDefaultController>>()
-
-// Helper to send event to a specific user
-export function sendEventToUser(userId: string, eventType: string, payload: any) {
-  const userConnections = connections.get(userId)
-  if (userConnections) {
-    const data = JSON.stringify({ type: eventType, payload })
-    userConnections.forEach(controller => {
-      try {
-        controller.enqueue(`data: ${data}\n\n`)
-      } catch (error) {
-        // Connection closed, will be cleaned up
-      }
-    })
-  }
-}
-
-// Helper to broadcast to all users
-export function broadcastEvent(eventType: string, payload: any) {
-  const data = JSON.stringify({ type: eventType, payload })
-  connections.forEach(userConnections => {
-    userConnections.forEach(controller => {
-      try {
-        controller.enqueue(`data: ${data}\n\n`)
-      } catch (error) {
-        // Connection closed
-      }
-    })
-  })
-}
+import { connections } from '@/lib/realtime'
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -77,7 +46,7 @@ export async function GET(request: NextRequest) {
       const heartbeat = setInterval(() => {
         try {
           controller.enqueue(`: heartbeat\n\n`)
-        } catch (error) {
+        } catch {
           clearInterval(heartbeat)
         }
       }, 30000)

@@ -21,7 +21,7 @@ import {
 } from 'lucide-react'
 
 export default async function AdminDashboardPage() {
-  const user = await requireRole(['ADMIN', 'ADVISOR'])
+  const user = await requireRole(['ADMIN'])
 
   // Stats
   const [
@@ -39,7 +39,7 @@ export default async function AdminDashboardPage() {
     prisma.dossier.count({ where: { status: 'TERMINE' } }),
     prisma.dossier.count({ where: { status: 'EN_ATTENTE' } }),
     prisma.user.count({ where: { role: 'CLIENT' } }),
-    prisma.message.count({ where: { isRead: false, isFromClient: true } }),
+    prisma.message.count({ where: { isRead: false, messageType: 'CLIENT' } }),
     prisma.dossierStep.count({ where: { status: 'PENDING_VALIDATION' } }),
     prisma.dossier.findMany({
       take: 5,
@@ -76,10 +76,10 @@ export default async function AdminDashboardPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-[var(--dark)]">
             Tableau de bord administrateur
           </h1>
-          <p className="text-gray-600 mt-1">
+          <p className="text-[var(--grey)] mt-1">
             Vue d'ensemble de l'activité KOPRO
           </p>
         </div>
@@ -93,22 +93,22 @@ export default async function AdminDashboardPage() {
 
       {/* Pending MPR Alert */}
       {pendingMprValidations > 0 && (
-        <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between">
+        <div className="p-4 bg-[var(--accent-2)]/10 border border-[var(--accent-2)]/30 rounded-2xl flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-amber-100 rounded-lg">
-              <Key className="h-5 w-5 text-amber-600" />
+            <div className="p-2 bg-[var(--accent-2)]/20 rounded-xl">
+              <Key className="h-5 w-5 text-[var(--accent-2)]" />
             </div>
             <div>
-              <p className="font-medium text-amber-800">
+              <p className="font-medium text-[var(--dark)]">
                 {pendingMprValidations} identifiant{pendingMprValidations > 1 ? 's' : ''} MaPrimeRénov' à valider
               </p>
-              <p className="text-sm text-amber-600">
+              <p className="text-sm text-[var(--grey)]">
                 Des clients attendent la validation de leur identifiant
               </p>
             </div>
           </div>
           <Link href="/admin/dossiers?filter=mpr_pending">
-            <Button variant="outline" size="sm" className="border-amber-300 text-amber-700 hover:bg-amber-100">
+            <Button variant="secondary" size="sm">
               Voir les dossiers
             </Button>
           </Link>
@@ -119,42 +119,42 @@ export default async function AdminDashboardPage() {
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardContent className="flex items-center gap-4 p-6">
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <FileText className="h-6 w-6 text-blue-600" />
+            <div className="p-3 bg-[var(--light-purple)] rounded-xl">
+              <FileText className="h-6 w-6 text-[var(--accent)]" />
             </div>
             <div>
-              <p className="text-sm text-gray-500">Dossiers totaux</p>
-              <p className="text-2xl font-bold text-gray-900">{totalDossiers}</p>
+              <p className="text-sm text-[var(--grey)]">Dossiers totaux</p>
+              <p className="text-2xl font-bold text-[var(--dark)]">{totalDossiers}</p>
             </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="flex items-center gap-4 p-6">
-            <div className="p-3 bg-green-100 rounded-lg">
-              <Users className="h-6 w-6 text-green-600" />
+            <div className="p-3 bg-[var(--success)]/10 rounded-xl">
+              <Users className="h-6 w-6 text-[var(--success)]" />
             </div>
             <div>
-              <p className="text-sm text-gray-500">Clients</p>
-              <p className="text-2xl font-bold text-gray-900">{totalClients}</p>
+              <p className="text-sm text-[var(--grey)]">Clients</p>
+              <p className="text-2xl font-bold text-[var(--dark)]">{totalClients}</p>
             </div>
           </CardContent>
         </Card>
 
         <Link href="/admin/messages">
-          <Card className="hover:shadow-md transition-shadow cursor-pointer">
+          <Card className="cursor-pointer">
             <CardContent className="flex items-center gap-4 p-6">
-              <div className="p-3 bg-yellow-100 rounded-lg relative">
-                <MessageSquare className="h-6 w-6 text-yellow-600" />
+              <div className="p-3 bg-[var(--accent-2)]/10 rounded-xl relative">
+                <MessageSquare className="h-6 w-6 text-[var(--accent-2)]" />
                 {unreadMessages > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 bg-[var(--required)] text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
                     {unreadMessages}
                   </span>
                 )}
               </div>
               <div>
-                <p className="text-sm text-gray-500">Messages non lus</p>
-                <p className="text-2xl font-bold text-gray-900">{unreadMessages}</p>
+                <p className="text-sm text-[var(--grey)]">Messages non lus</p>
+                <p className="text-2xl font-bold text-[var(--dark)]">{unreadMessages}</p>
               </div>
             </CardContent>
           </Card>
@@ -162,12 +162,12 @@ export default async function AdminDashboardPage() {
 
         <Card>
           <CardContent className="flex items-center gap-4 p-6">
-            <div className="p-3 bg-purple-100 rounded-lg">
-              <Clock className="h-6 w-6 text-purple-600" />
+            <div className="p-3 bg-[var(--light-purple)] rounded-xl">
+              <Clock className="h-6 w-6 text-[var(--accent)]" />
             </div>
             <div>
-              <p className="text-sm text-gray-500">En attente validation</p>
-              <p className="text-2xl font-bold text-gray-900">{pendingValidations}</p>
+              <p className="text-sm text-[var(--grey)]">En attente validation</p>
+              <p className="text-2xl font-bold text-[var(--dark)]">{pendingValidations}</p>
             </div>
           </CardContent>
         </Card>
@@ -178,15 +178,15 @@ export default async function AdminDashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
+              <TrendingUp className="h-5 w-5 text-[var(--accent)]" />
               Répartition des dossiers
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
               <div className="flex justify-between text-sm mb-1">
-                <span className="text-gray-600">En cours</span>
-                <span className="font-medium">{dossiersEnCours}</span>
+                <span className="text-[var(--grey)]">En cours</span>
+                <span className="font-medium text-[var(--dark)]">{dossiersEnCours}</span>
               </div>
               <Progress
                 value={totalDossiers > 0 ? (dossiersEnCours / totalDossiers) * 100 : 0}
@@ -195,8 +195,8 @@ export default async function AdminDashboardPage() {
             </div>
             <div>
               <div className="flex justify-between text-sm mb-1">
-                <span className="text-gray-600">En attente</span>
-                <span className="font-medium">{dossiersEnAttente}</span>
+                <span className="text-[var(--grey)]">En attente</span>
+                <span className="font-medium text-[var(--dark)]">{dossiersEnAttente}</span>
               </div>
               <Progress
                 value={totalDossiers > 0 ? (dossiersEnAttente / totalDossiers) * 100 : 0}
@@ -205,8 +205,8 @@ export default async function AdminDashboardPage() {
             </div>
             <div>
               <div className="flex justify-between text-sm mb-1">
-                <span className="text-gray-600">Terminés</span>
-                <span className="font-medium">{dossiersTermines}</span>
+                <span className="text-[var(--grey)]">Terminés</span>
+                <span className="font-medium text-[var(--dark)]">{dossiersTermines}</span>
               </div>
               <Progress
                 value={totalDossiers > 0 ? (dossiersTermines / totalDossiers) * 100 : 0}
@@ -219,27 +219,27 @@ export default async function AdminDashboardPage() {
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Euro className="h-5 w-5" />
+              <Euro className="h-5 w-5 text-[var(--accent)]" />
               Aides mobilisées
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid sm:grid-cols-3 gap-4">
-              <div className="p-4 bg-green-50 rounded-lg">
-                <p className="text-sm text-gray-600 mb-1">MaPrimeRénov'</p>
-                <p className="text-xl font-bold text-green-700">
+              <div className="p-4 bg-[var(--success)]/10 rounded-xl">
+                <p className="text-sm text-[var(--grey)] mb-1">MaPrimeRénov'</p>
+                <p className="text-xl font-bold text-[var(--success)]">
                   {formatCurrency(amountsResult._sum.mprAmount || 0)}
                 </p>
               </div>
-              <div className="p-4 bg-blue-50 rounded-lg">
-                <p className="text-sm text-gray-600 mb-1">Prime CEE</p>
-                <p className="text-xl font-bold text-blue-700">
+              <div className="p-4 bg-[var(--accent)]/10 rounded-xl">
+                <p className="text-sm text-[var(--grey)] mb-1">Prime CEE</p>
+                <p className="text-xl font-bold text-[var(--accent)]">
                   {formatCurrency(amountsResult._sum.ceeAmount || 0)}
                 </p>
               </div>
-              <div className="p-4 bg-purple-50 rounded-lg">
-                <p className="text-sm text-gray-600 mb-1">Total</p>
-                <p className="text-xl font-bold text-purple-700">
+              <div className="p-4 bg-[var(--accent-2)]/10 rounded-xl">
+                <p className="text-sm text-[var(--grey)] mb-1">Total</p>
+                <p className="text-xl font-bold text-[var(--accent-2)]">
                   {formatCurrency(totalAides)}
                 </p>
               </div>
@@ -254,13 +254,13 @@ export default async function AdminDashboardPage() {
           <CardTitle>Dossiers récents</CardTitle>
           <Link
             href="/admin/dossiers"
-            className="text-sm text-primary-600 hover:text-primary-700"
+            className="text-sm text-[var(--accent)] hover:text-[var(--dark)] transition-colors"
           >
             Voir tous
           </Link>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <div className="space-y-3">
             {recentDossiers.map(dossier => {
               const currentStep = dossier.steps.find(
                 s =>
@@ -274,48 +274,68 @@ export default async function AdminDashboardPage() {
                   100
               )
 
+              const isClosed = dossier.status === 'CLOTURE' || dossier.status === 'TERMINE'
+
               return (
                 <Link
                   key={dossier.id}
                   href={`/admin/dossiers/${dossier.id}`}
                   className="block"
                 >
-                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                  <div className={`flex items-center justify-between p-4 rounded-xl transition-all duration-200 ${
+                    isClosed
+                      ? 'bg-[var(--success)]/5 hover:bg-[var(--success)]/10 border border-[var(--success)]/20'
+                      : 'bg-[var(--light-purple)]/30 hover:bg-[var(--light-purple)]/50'
+                  }`}>
                     <div className="flex items-center gap-4">
+                      {isClosed && (
+                        <div className="p-2 bg-[var(--success)]/10 rounded-full">
+                          <CheckCircle className="h-5 w-5 text-[var(--success)]" />
+                        </div>
+                      )}
                       <div>
                         <div className="flex items-center gap-2">
-                          <p className="font-medium text-gray-900">
+                          <p className={`font-medium ${isClosed ? 'text-[var(--success)]' : 'text-[var(--dark)]'}`}>
                             {dossier.reference}
                           </p>
                           <Badge
-                            variant={
-                              dossier.status === 'TERMINE'
-                                ? 'success'
+                            variant="success"
+                            className={
+                              isClosed
+                                ? 'bg-[var(--success)] text-white'
                                 : dossier.status === 'EN_ATTENTE'
-                                ? 'warning'
-                                : 'info'
+                                ? 'bg-[var(--accent-2)]/20 text-[var(--accent-2)]'
+                                : 'bg-[var(--light-purple)] text-[var(--accent)]'
                             }
                           >
-                            {dossier.status.replace('_', ' ')}
+                            {isClosed ? 'Clôturé' : dossier.status.replace('_', ' ')}
                           </Badge>
                         </div>
-                        <p className="text-sm text-gray-500">
+                        <p className={`text-sm ${isClosed ? 'text-[var(--success)]' : 'text-[var(--grey)]'}`}>
                           {dossier.client.firstName} {dossier.client.lastName}
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-6">
-                      {currentStep && (
+                      {currentStep && !isClosed && (
                         <div className="text-right">
-                          <p className="text-xs text-gray-500">Étape en cours</p>
-                          <p className="text-sm font-medium">
+                          <p className="text-xs text-[var(--grey)]">Étape en cours</p>
+                          <p className="text-sm font-medium text-[var(--dark)]">
                             {currentStep.template.name}
                           </p>
                         </div>
                       )}
+                      {isClosed && (
+                        <div className="text-right">
+                          <p className="text-xs text-[var(--success)]">Dossier terminé</p>
+                          <p className="text-sm font-medium text-[var(--success)]">
+                            100% complété
+                          </p>
+                        </div>
+                      )}
                       <div className="w-24">
-                        <Progress value={progress} className="h-2" />
-                        <p className="text-xs text-gray-500 text-center mt-1">
+                        <Progress value={progress} className={`h-2 ${isClosed ? '[&>div]:bg-[var(--success)]' : ''}`} />
+                        <p className={`text-xs text-center mt-1 ${isClosed ? 'text-[var(--success)]' : 'text-[var(--grey)]'}`}>
                           {progress}%
                         </p>
                       </div>

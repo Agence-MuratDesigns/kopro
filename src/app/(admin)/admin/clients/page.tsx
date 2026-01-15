@@ -19,7 +19,7 @@ import {
 } from 'lucide-react'
 
 export default async function ClientsPage() {
-  await requireRole(['ADMIN', 'ADVISOR'])
+  await requireRole(['ADMIN'])
 
   const clients = await prisma.user.findMany({
     where: { role: 'CLIENT' },

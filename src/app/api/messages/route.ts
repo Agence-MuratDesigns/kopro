@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyAuth } from '@/lib/auth'
-import { sendEventToUser } from '@/app/api/realtime/events/route'
+import { sendEventToUser } from '@/lib/realtime'
 
 export async function GET(request: NextRequest) {
   try {
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
 
     // Create notification for admins
     const admins = await prisma.user.findMany({
-      where: { role: { in: ['ADMIN', 'ADVISOR'] } },
+      where: { role: { in: ['ADMIN'] } },
       select: { id: true },
     })
 

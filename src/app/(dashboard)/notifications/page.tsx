@@ -67,8 +67,8 @@ export default async function NotificationsPage() {
     <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Notifications</h1>
-          <p className="text-gray-600 mt-1">
+          <h1 className="text-3xl font-bold text-kopro-dark">Notifications</h1>
+          <p className="text-kopro-grey mt-2 text-lg">
             {unreadCount > 0
               ? `${unreadCount} nouvelle${unreadCount > 1 ? 's' : ''} notification${unreadCount > 1 ? 's' : ''}`
               : 'Toutes les notifications sont lues'}

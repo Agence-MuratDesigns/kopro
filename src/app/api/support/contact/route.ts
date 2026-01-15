@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
 
     // Create notification for admins
     const admins = await prisma.user.findMany({
-      where: { role: { in: ['ADMIN', 'ADVISOR'] } },
+      where: { role: { in: ['ADMIN'] } },
       select: { id: true },
     })
 

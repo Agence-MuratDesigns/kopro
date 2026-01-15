@@ -57,8 +57,8 @@ export default async function MessagesPage({ searchParams }: Props) {
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Messages</h1>
-        <p className="text-gray-600 mt-1">
+        <h1 className="text-3xl font-bold text-kopro-dark">Messages</h1>
+        <p className="text-kopro-grey mt-2 text-lg">
           Échangez avec votre conseiller KOPRO
         </p>
       </div>

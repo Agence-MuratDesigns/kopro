@@ -152,10 +152,7 @@ export async function startStep(dossierId: string, stepId: string) {
     },
   })
 
-  await prisma.dossier.update({
-    where: { id: dossierId },
-    data: { currentStepId: stepId },
-  })
+  // Note: currentStep is tracked via step status, not a direct field update
 
   return { success: true }
 }
@@ -199,7 +196,7 @@ export async function completeStep(dossierId: string, stepId: string) {
 
   // Notify admins
   const admins = await prisma.user.findMany({
-    where: { role: { in: ['ADMIN', 'ADVISOR'] } },
+    where: { role: 'ADMIN' },
   })
 
   for (const admin of admins) {

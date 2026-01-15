@@ -1,22 +1,17 @@
 import { requireAuth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
-import { Alert } from '@/components/ui/alert'
 import { HorizontalTimeline } from '@/components/dashboard/horizontal-timeline'
 import { StepTimeline } from '@/components/dashboard/step-timeline'
-import { calculateProgress, formatDate, formatDateTime, formatCurrency } from '@/lib/utils'
+import { OpenChatButton } from '@/components/dashboard/open-chat-button'
+import { calculateProgress, formatDateTime } from '@/lib/utils'
 import Link from 'next/link'
 import {
   FileText,
   MessageSquare,
-  Bell,
-  Plus,
-  Euro,
-  Home,
-  Calendar,
   ArrowRight,
   Clock,
   CheckCircle,
@@ -24,6 +19,13 @@ import {
   Upload,
   Edit,
   History,
+  LogIn,
+  UserPlus,
+  Lock,
+  Mail,
+  Hammer,
+  FileCheck,
+  Send,
 } from 'lucide-react'
 
 export default async function DashboardPage() {
@@ -50,23 +52,6 @@ export default async function DashboardPage() {
       },
     },
     orderBy: { createdAt: 'desc' },
-  })
-
-  // Get unread notifications count
-  const unreadNotifications = await prisma.notification.count({
-    where: {
-      userId: user.id,
-      isRead: false,
-    },
-  })
-
-  // Get unread messages count
-  const unreadMessages = await prisma.message.count({
-    where: {
-      dossier: { clientId: user.id },
-      isRead: false,
-      messageType: { in: ['ADMIN', 'SYSTEM'] },
-    },
   })
 
   // Get recent activity
@@ -99,10 +84,10 @@ export default async function DashboardPage() {
     <div className="space-y-6 animate-fade-in">
       {/* Welcome Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">
-          Bonjour, {user.firstName} !
+        <h1 className="text-3xl font-bold text-kopro-dark">
+          Bonjour, {user.firstName} ! 👋
         </h1>
-        <p className="text-gray-600 mt-1">
+        <p className="text-kopro-grey mt-2 text-lg">
           Bienvenue sur votre espace de suivi de rénovation KOPRO
         </p>
       </div>
@@ -150,17 +135,24 @@ export default async function DashboardPage() {
 
           {/* Current Step Action Card */}
           {currentStep && (
-            <Card className={currentStep.status === 'BLOCKED' ? 'border-red-200 bg-red-50' : 'border-primary-200 bg-primary-50'}>
-              <CardContent className="py-6">
+            <div className={currentStep.status === 'BLOCKED'
+              ? 'rounded-2xl border-red-200 bg-red-50 border'
+              : 'rounded-2xl bg-accent text-white'
+            }
+            style={currentStep.status !== 'BLOCKED' ? {
+              boxShadow: 'rgba(250, 251, 253, 0.68) 0px 0px 1em -0.3em inset, rgba(78, 27, 81, 0.07) 0px 1.7px 6.9px 0px, rgba(78, 27, 81, 0.082) 0px 3.8px 14.1px 0px, rgba(78, 27, 81, 0.086) 0px 7.1px 22.1px 0px, rgba(78, 27, 81, 0.094) 0px 15px 33.1px 0px'
+            } : {}}
+            >
+              <div className="py-6 px-6">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                   <div>
-                    <p className="text-sm text-gray-500 mb-1">
+                    <p className={currentStep.status === 'BLOCKED' ? 'text-sm text-gray-500 mb-1' : 'text-sm text-white/80 mb-1'}>
                       {currentStep.status === 'BLOCKED' ? 'Action requise' : 'Prochaine étape'}
                     </p>
-                    <h3 className="text-xl font-semibold text-gray-900">
+                    <h3 className={currentStep.status === 'BLOCKED' ? 'text-xl font-semibold text-gray-900' : 'text-xl font-bold text-white'}>
                       {currentStep.template.name}
                     </h3>
-                    <p className="text-gray-600 mt-1">
+                    <p className={currentStep.status === 'BLOCKED' ? 'text-gray-600 mt-1' : 'text-white/90 mt-1'}>
                       {currentStep.template.description}
                     </p>
                     {currentStep.blockedReason && (
@@ -170,18 +162,24 @@ export default async function DashboardPage() {
                     )}
                   </div>
                   <Link href={`/dossier/${mainDossier.id}/etape/${currentStep.template.code}`}>
-                    <Button size="lg" className={currentStep.status === 'BLOCKED' ? 'bg-red-600 hover:bg-red-700' : ''}>
+                    <Button
+                      size="lg"
+                      className={currentStep.status === 'BLOCKED'
+                        ? 'bg-red-600 hover:bg-red-700'
+                        : 'bg-white text-accent hover:bg-gray-100 hover:text-kopro-dark'
+                      }
+                    >
                       {currentStep.status === 'BLOCKED' ? 'Corriger' : 'Continuer'}
                       <ArrowRight className="h-4 w-4 ml-2" />
                     </Button>
                   </Link>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           )}
 
           {/* Info Cards Grid */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid md:grid-cols-2 gap-4">
             {/* Dossier Info */}
             <Card>
               <CardHeader className="pb-2">
@@ -190,50 +188,12 @@ export default async function DashboardPage() {
                   <Badge variant="info">{mainDossier.reference}</Badge>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center gap-2 text-sm">
-                  <Calendar className="h-4 w-4 text-gray-400" />
-                  <span className="text-gray-500">Créé le</span>
-                  <span className="font-medium">{formatDate(mainDossier.createdAt)}</span>
-                </div>
-                {mainDossier.mprId && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <FileText className="h-4 w-4 text-gray-400" />
-                    <span className="text-gray-500">ID MPR</span>
-                    <span className="font-mono font-medium">{mainDossier.mprId}</span>
-                  </div>
-                )}
+              <CardContent>
                 <Link href={`/dossier/${mainDossier.id}`}>
-                  <Button variant="outline" size="sm" className="w-full mt-2">
+                  <Button variant="outline" size="sm" className="w-full">
                     Voir le détail
                   </Button>
                 </Link>
-              </CardContent>
-            </Card>
-
-            {/* Aides Card */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Euro className="h-4 w-4" />
-                  Aides estimées
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 bg-green-50 rounded-lg">
-                    <p className="text-xs text-gray-500">MaPrimeRénov'</p>
-                    <p className="text-lg font-bold text-green-700">
-                      {mainDossier.mprAmount ? formatCurrency(mainDossier.mprAmount) : '—'}
-                    </p>
-                  </div>
-                  <div className="p-3 bg-blue-50 rounded-lg">
-                    <p className="text-xs text-gray-500">CEE</p>
-                    <p className="text-lg font-bold text-blue-700">
-                      {mainDossier.ceeAmount ? formatCurrency(mainDossier.ceeAmount) : '—'}
-                    </p>
-                  </div>
-                </div>
               </CardContent>
             </Card>
 
@@ -249,12 +209,7 @@ export default async function DashboardPage() {
                 <p className="text-sm text-gray-600 mb-3">
                   Votre conseiller KOPRO est à votre disposition pour répondre à vos questions.
                 </p>
-                <Link href="/messages">
-                  <Button variant="outline" size="sm" className="w-full">
-                    <MessageSquare className="h-4 w-4 mr-2" />
-                    Envoyer un message
-                  </Button>
-                </Link>
+                <OpenChatButton />
               </CardContent>
             </Card>
           </div>
@@ -280,48 +235,111 @@ export default async function DashboardPage() {
                       const getActivityIcon = () => {
                         switch (activity.action) {
                           case 'STEP_VALIDATED':
-                            return <CheckCircle className="h-4 w-4 text-green-500" />
+                          case 'MPR_ID_VALIDATED':
+                          case 'MANDATE_VALIDATED':
+                          case 'QUOTES_VALIDATED':
+                          case 'INVOICES_VALIDATED':
+                          case 'DOSSIER_FINALIZED':
+                            return <CheckCircle className="h-4 w-4 text-kopro-dark" />
                           case 'STEP_REJECTED':
                           case 'DOCUMENT_REJECTED':
-                            return <AlertCircle className="h-4 w-4 text-red-500" />
+                          case 'MPR_ID_REJECTED':
+                            return <AlertCircle className="h-4 w-4 text-kopro-dark" />
                           case 'DOCUMENT_UPLOAD':
-                            return <Upload className="h-4 w-4 text-blue-500" />
+                            return <Upload className="h-4 w-4 text-kopro-dark" />
                           case 'PROFILE_UPDATE':
                           case 'STEP_SUBMITTED':
-                            return <Edit className="h-4 w-4 text-amber-500" />
+                          case 'MPR_ID_SUBMITTED':
+                            return <Edit className="h-4 w-4 text-kopro-dark" />
+                          case 'LOGIN':
+                            return <LogIn className="h-4 w-4 text-kopro-dark" />
+                          case 'CLIENT_CREATED':
+                          case 'DOSSIER_CREATED':
+                            return <UserPlus className="h-4 w-4 text-kopro-dark" />
+                          case 'PASSWORD_CHANGED':
+                            return <Lock className="h-4 w-4 text-kopro-dark" />
+                          case 'EMAIL_CHANGED':
+                            return <Mail className="h-4 w-4 text-kopro-dark" />
+                          case 'WORKS_SELECTED':
+                          case 'WORK_STARTED':
+                            return <Hammer className="h-4 w-4 text-kopro-dark" />
+                          case 'MANDATE_SUBMITTED':
+                          case 'QUOTES_SUBMITTED':
+                          case 'INVOICES_SUBMITTED':
+                            return <FileCheck className="h-4 w-4 text-kopro-dark" />
+                          case 'MESSAGE_SENT':
+                          case 'MESSAGE_RECEIVED':
+                          case 'SUPPORT_REQUEST':
+                            return <Send className="h-4 w-4 text-kopro-dark" />
+                          case 'AVATAR_UPDATE':
+                            return <Edit className="h-4 w-4 text-kopro-dark" />
                           default:
-                            return <Clock className="h-4 w-4 text-gray-400" />
+                            return <Clock className="h-4 w-4 text-kopro-dark" />
                         }
                       }
 
                       const getActivityLabel = () => {
                         switch (activity.action) {
                           case 'STEP_VALIDATED':
-                            return 'Étape validée'
+                            return 'Votre étape a été validée'
                           case 'STEP_REJECTED':
-                            return 'Étape refusée'
+                            return 'Une correction est nécessaire'
                           case 'STEP_SUBMITTED':
-                            return 'Étape soumise'
+                            return 'Étape envoyée pour validation'
+                          case 'MPR_ID_SUBMITTED':
+                            return 'Identifiant MPR enregistré'
+                          case 'MPR_ID_VALIDATED':
+                            return 'Identifiant MPR validé'
+                          case 'MPR_ID_REJECTED':
+                            return 'Identifiant MPR à corriger'
+                          case 'MANDATE_SUBMITTED':
+                            return 'Mandat envoyé'
+                          case 'MANDATE_VALIDATED':
+                            return 'Mandat validé'
+                          case 'QUOTES_SUBMITTED':
+                            return 'Devis envoyés'
+                          case 'QUOTES_VALIDATED':
+                            return 'Devis validés'
+                          case 'INVOICES_SUBMITTED':
+                            return 'Factures envoyées'
+                          case 'INVOICES_VALIDATED':
+                            return 'Factures validées'
+                          case 'WORKS_SELECTED':
+                            return 'Travaux sélectionnés'
+                          case 'WORK_STARTED':
+                            return 'Début des travaux signalé'
                           case 'DOCUMENT_UPLOAD':
-                            return 'Document déposé'
+                            return 'Document ajouté'
                           case 'DOCUMENT_REJECTED':
-                            return 'Document refusé'
+                            return 'Document à remplacer'
                           case 'PROFILE_UPDATE':
                             return 'Profil mis à jour'
                           case 'AVATAR_UPDATE':
-                            return 'Photo mise à jour'
+                            return 'Photo de profil modifiée'
                           case 'MESSAGE_SENT':
                             return 'Message envoyé'
+                          case 'MESSAGE_RECEIVED':
+                            return 'Nouveau message reçu'
                           case 'SUPPORT_REQUEST':
-                            return 'Demande de support'
+                            return 'Demande d\'assistance envoyée'
                           case 'DOSSIER_CREATED':
                             return 'Dossier créé'
+                          case 'CLIENT_CREATED':
+                            return 'Bienvenue sur KOPRO'
+                          case 'LOGIN':
+                            return 'Connexion à votre espace'
+                          case 'PASSWORD_CHANGED':
+                            return 'Mot de passe modifié'
+                          case 'EMAIL_CHANGED':
+                            return 'Adresse email modifiée'
+                          case 'DOSSIER_FINALIZED':
+                            return 'Dossier finalisé'
                           default:
-                            return activity.action
+                            return 'Activité sur votre dossier'
                         }
                       }
 
-                      const isAdminAction = activity.user?.role === 'ADMIN' || activity.user?.role === 'ADVISOR'
+                      const isAdminAction = activity.user?.role === 'ADMIN'
 
                       return (
                         <div key={activity.id} className="flex items-start gap-3">

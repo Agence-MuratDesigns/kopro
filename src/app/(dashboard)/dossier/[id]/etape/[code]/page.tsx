@@ -115,10 +115,10 @@ export default async function StepPage({ params }: Props) {
             <p className="text-sm text-gray-500 mb-1">
               Étape {stepIndex + 1} sur {dossier.steps.length}
             </p>
-            <h1 className="text-2xl font-bold text-gray-900">
+            <h1 className="text-3xl font-bold text-kopro-dark">
               {step.template.name}
             </h1>
-            <p className="text-gray-600 mt-2">
+            <p className="text-kopro-grey mt-2 text-lg">
               {step.template.description}
             </p>
           </div>
@@ -168,19 +168,24 @@ export default async function StepPage({ params }: Props) {
         <MandateSignatureForm
           dossierId={id}
           mandatStatus={dossier.mandatStatus}
-          mandatMethod={dossier.mandatMethod}
           mandatReviewMessage={dossier.mandatReviewMessage}
         />
       )}
 
       {/* Step 4: Work Selection Form */}
-      {code === 'WORK_SELECTION' && (
-        <WorkSelectionForm
-          dossierId={id}
-          selectedWorks={selectedWorks}
-          isValidated={step.status === 'VALIDATED'}
-        />
-      )}
+      {code === 'WORK_SELECTION' && (() => {
+        // Vérifier si l'étape 5 (devis) est validée
+        const quoteStep = dossier.steps.find(s => s.template.code === 'QUOTE_DEPOSIT')
+        const canModifyWorks = !quoteStep || quoteStep.status !== 'VALIDATED'
+        return (
+          <WorkSelectionForm
+            dossierId={id}
+            selectedWorks={selectedWorks}
+            isValidated={step.status === 'VALIDATED'}
+            canModify={canModifyWorks}
+          />
+        )
+      })()}
 
       {/* Step 5: Quote Deposit Form */}
       {code === 'QUOTE_DEPOSIT' && (

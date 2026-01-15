@@ -32,7 +32,7 @@ interface Document {
 interface QuoteDepositFormProps {
   dossierId: string
   selectedWorks: string[]
-  quotesStatus: string
+  quotesStatus: string | null
   quotesReviewMessage: string | null
   documents: Document[]
 }
@@ -202,6 +202,11 @@ export function QuoteDepositForm({
 
   const statusDisplay = getStatusDisplay()
 
+  // Vérifier s'il y a des travaux sans devis (utile après modification de l'étape 4)
+  const worksWithoutQuotes = selectedWorks.filter(
+    work => !documentsByWork[work] || documentsByWork[work].length === 0
+  )
+
   return (
     <Card>
       <CardHeader>
@@ -234,6 +239,18 @@ export function QuoteDepositForm({
             }
           >
             {statusDisplay.message}
+          </Alert>
+        )}
+
+        {/* Alerte si des travaux n'ont pas de devis (après modification étape 4) */}
+        {statusDisplay.canEdit && worksWithoutQuotes.length > 0 && documents.length > 0 && (
+          <Alert variant="warning" title="Devis manquants">
+            Suite à la modification de votre sélection de travaux, vous devez déposer des devis pour : {' '}
+            <strong>
+              {worksWithoutQuotes
+                .map(code => WORK_TYPES.find(w => w.code === code)?.label)
+                .join(', ')}
+            </strong>
           </Alert>
         )}
 

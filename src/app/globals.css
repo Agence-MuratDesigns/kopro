@@ -2,13 +2,28 @@
 @tailwind components;
 @tailwind utilities;
 
+/* CSS Variables */
+:root {
+  --accent: #7645fb;
+  --accent-2: #fba045;
+  --light-cream: #fafbfd;
+  --dark: #212121;
+  --white: #ffffff;
+  --required: #f16161;
+  --grey: #bcbcbc;
+  --light-purple: #e6ddff;
+  --success: #1cc562;
+}
+
 @layer base {
   html {
     scroll-behavior: smooth;
   }
 
   body {
-    @apply antialiased text-gray-900 bg-gray-50;
+    @apply antialiased text-kopro-dark;
+    background: linear-gradient(180deg, var(--white), hsla(256.15deg, 95.79%, 62.75%, 0.12));
+    min-height: 100vh;
   }
 
   * {
@@ -21,34 +36,242 @@
     @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
   }
 
+  /* Gradient background overlay */
+  .gradient-background {
+    position: fixed;
+    inset: 0;
+    background: linear-gradient(180deg, var(--white), hsla(256.15deg, 95.79%, 62.75%, 0.12));
+    opacity: 1;
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  /* App gradient background with logo watermark */
+  .app-gradient-background {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    padding: 0.5em;
+    justify-content: flex-end;
+    align-items: flex-end;
+    background: linear-gradient(180deg, var(--white), hsla(256.15deg, 95.79%, 62.75%, 0.12));
+    opacity: 1;
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  .app-logo-background {
+    width: 25em;
+    opacity: 0.05;
+  }
+
+  /* Main button style */
   .btn-primary {
-    @apply bg-primary-600 text-white px-4 py-2 rounded-lg font-medium;
-    @apply hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2;
-    @apply transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center font-medium text-white;
+    padding: 0.9em 1.5em;
+    gap: 0.5em;
+    border-radius: 8em;
+    background-color: var(--accent);
+    box-shadow: rgba(250, 251, 253, 0.68) 0px 0px 1em -0.3em inset,
+                rgba(78, 27, 81, 0.07) 0px 1.7px 6.9px 0px,
+                rgba(78, 27, 81, 0.082) 0px 3.8px 14.1px 0px,
+                rgba(78, 27, 81, 0.086) 0px 7.1px 22.1px 0px,
+                rgba(78, 27, 81, 0.094) 0px 15px 33.1px 0px;
+    transition: all 200ms ease;
+    font-size: 1.05em;
   }
 
+  .btn-primary:hover {
+    background-color: var(--dark);
+    box-shadow: rgba(250, 251, 253, 0) 0px 0px 1em -0.3em inset;
+    transform: scale(0.95);
+  }
+
+  .btn-primary:active {
+    transform: scale(0.93);
+  }
+
+  .btn-primary:disabled {
+    @apply opacity-50 cursor-not-allowed;
+    transform: none;
+  }
+
+  /* Secondary button */
+  .btn-secondary {
+    @apply inline-flex items-center justify-center font-medium;
+    padding: 0.9em 1.5em;
+    gap: 0.5em;
+    border-radius: 8em;
+    background-color: var(--light-purple);
+    color: var(--accent);
+    transition: all 200ms ease;
+    font-size: 1.05em;
+  }
+
+  .btn-secondary:hover {
+    background-color: var(--accent);
+    color: var(--white);
+    transform: scale(0.95);
+  }
+
+  .btn-secondary:active {
+    transform: scale(0.93);
+  }
+
+  /* Outline button */
+  .btn-outline {
+    @apply inline-flex items-center justify-center font-medium;
+    padding: 0.9em 1.5em;
+    gap: 0.5em;
+    border-radius: 8em;
+    background-color: transparent;
+    border: 1.5px solid var(--accent);
+    color: var(--accent);
+    transition: all 200ms ease;
+    font-size: 1.05em;
+  }
+
+  .btn-outline:hover {
+    background-color: var(--accent);
+    color: var(--white);
+    transform: scale(0.95);
+  }
+
+  /* Ghost button */
+  .btn-ghost {
+    @apply inline-flex items-center justify-center font-medium;
+    padding: 0.9em 1.5em;
+    gap: 0.5em;
+    border-radius: 8em;
+    background-color: transparent;
+    color: var(--dark);
+    transition: all 200ms ease;
+    font-size: 1.05em;
+  }
+
+  .btn-ghost:hover {
+    background-color: var(--light-purple);
+    color: var(--accent);
+  }
+
+  /* Danger button */
+  .btn-danger {
+    @apply inline-flex items-center justify-center font-medium text-white;
+    padding: 0.9em 1.5em;
+    gap: 0.5em;
+    border-radius: 8em;
+    background-color: var(--required);
+    transition: all 200ms ease;
+    font-size: 1.05em;
+  }
+
+  .btn-danger:hover {
+    background-color: #d94545;
+    transform: scale(0.95);
+  }
+
+  /* Input field style */
   .input-field {
-    @apply w-full rounded-lg border border-gray-300 px-3 py-2;
-    @apply focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500;
-    @apply placeholder:text-gray-400 disabled:bg-gray-50 disabled:text-gray-500;
+    @apply w-full text-kopro-dark;
+    height: auto;
+    padding: 0.9em 1em;
+    border: none;
+    border-radius: 0.6em;
+    box-shadow: rgba(210, 149, 221, 0) 0px 0px 0px 0px,
+                rgba(210, 149, 221, 0.02) -0.2px 2.3px 3px 0px,
+                rgba(210, 149, 221, 0.024) -0.5px 4.6px 6px 0px,
+                rgba(210, 149, 221, 0.027) -0.7px 7.1px 9px 0px,
+                rgba(210, 149, 221, 0.03) -2.9px 29.2px 26.1px 0px,
+                rgba(210, 149, 221, 0.03) -4px 39.7px 30.9px 0px,
+                rgba(210, 149, 221, 0.035) -5.8px 57.2px 37.1px 0px,
+                rgba(210, 149, 221, 0.035) -9.4px 92.7px 47.1px 0px;
+    font-size: 1.05em;
+    background-color: var(--white);
+    transition: box-shadow 200ms ease, border-color 200ms ease;
   }
 
+  .input-field::placeholder {
+    color: rgba(33, 33, 33, 0.2);
+    font-style: italic;
+  }
+
+  .input-field:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--light-purple),
+                rgba(210, 149, 221, 0.02) -0.2px 2.3px 3px 0px,
+                rgba(210, 149, 221, 0.024) -0.5px 4.6px 6px 0px,
+                rgba(210, 149, 221, 0.027) -0.7px 7.1px 9px 0px,
+                rgba(210, 149, 221, 0.03) -2.9px 29.2px 26.1px 0px;
+  }
+
+  .input-field.error {
+    box-shadow: 0 0 0 2px rgba(241, 97, 97, 0.3),
+                rgba(210, 149, 221, 0.02) -0.2px 2.3px 3px 0px,
+                rgba(210, 149, 221, 0.024) -0.5px 4.6px 6px 0px;
+  }
+
+  .input-field:disabled {
+    @apply bg-gray-50 text-gray-500 cursor-not-allowed;
+  }
+
+  /* Card style */
   .card {
-    @apply bg-white rounded-xl border border-gray-200 shadow-sm;
+    @apply bg-white rounded-2xl;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05),
+                0 4px 6px -1px rgba(118, 69, 251, 0.05);
+    border: 1px solid rgba(230, 221, 255, 0.5);
+    transition: all 200ms ease;
+  }
+
+  .card:hover {
+    box-shadow: 0 10px 25px -5px rgba(118, 69, 251, 0.1),
+                0 8px 10px -6px rgba(118, 69, 251, 0.05);
+  }
+
+  /* Form label */
+  .form-label {
+    @apply block text-sm font-medium mb-2;
+    color: var(--dark);
+  }
+
+  /* Checkbox style */
+  .checkbox {
+    @apply h-4 w-4 rounded;
+    accent-color: var(--accent);
   }
 }
 
 @layer utilities {
   .gradient-primary {
-    @apply bg-gradient-to-r from-primary-600 to-primary-700;
+    background: linear-gradient(135deg, var(--accent), #9b6dff);
   }
 
   .gradient-success {
-    @apply bg-gradient-to-r from-green-500 to-emerald-600;
+    background: linear-gradient(135deg, var(--success), #25d472);
+  }
+
+  .gradient-accent {
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
   }
 
   .text-balance {
     text-wrap: balance;
+  }
+
+  .text-accent {
+    color: var(--accent);
+  }
+
+  .bg-accent {
+    background-color: var(--accent);
+  }
+
+  .bg-light-purple {
+    background-color: var(--light-purple);
+  }
+
+  .border-accent {
+    border-color: var(--accent);
   }
 }
 
@@ -59,15 +282,16 @@
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-gray-100;
+  background: var(--light-cream);
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-gray-300 rounded-full;
+  background: var(--light-purple);
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-gray-400;
+  background: var(--accent);
 }
 
 /* Animation keyframes */
@@ -120,6 +344,11 @@
   50% { transform: translateY(-5px); }
 }
 
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
 .animate-fade-in {
   animation: fade-in 0.3s ease-out;
 }
@@ -144,6 +373,10 @@
   animation: bounce-soft 1s ease-in-out infinite;
 }
 
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
 /* Button click effect */
 .btn-click:active {
   transform: scale(0.97);
@@ -155,23 +388,49 @@
   transition: all 0.2s ease;
 }
 
-/* Status colors for steps */
+/* Status colors for steps - updated to violet theme */
 .step-validated {
-  @apply bg-green-500;
+  background-color: var(--success);
 }
 
 .step-in-progress {
-  @apply bg-yellow-500;
+  background-color: var(--accent);
+}
+
+.step-pending-validation {
+  background-color: var(--accent-2);
 }
 
 .step-available {
-  @apply bg-blue-500;
+  background-color: var(--light-purple);
 }
 
 .step-locked {
-  @apply bg-gray-300;
+  background-color: var(--grey);
 }
 
 .step-blocked {
-  @apply bg-red-500;
+  background-color: var(--required);
+}
+
+/* Link styles */
+a.link {
+  color: var(--accent);
+  transition: color 200ms ease;
+}
+
+a.link:hover {
+  color: var(--dark);
+}
+
+/* Focus visible for accessibility */
+*:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Selection color */
+::selection {
+  background-color: var(--light-purple);
+  color: var(--dark);
 }

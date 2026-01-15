@@ -1,21 +1,60 @@
 'use client'
 
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 type SoundType = 'message' | 'notification' | 'success' | 'error' | 'click'
 
-// Base64 encoded short sounds (very small audio files)
-const SOUNDS: Record<SoundType, string> = {
-  // Short gentle chime for messages
-  message: 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2QkpOVj4J1ZmJtfI2YmZaQhHRlY3B+jpaZlpGFd2llbXuLlZiXlIl8cGlpcHuGjZCQjoiCenRwcXV5fYGEhoaGhoWEgn98eXh3d3h5e31/gIGBgIB/fn18e3t6enp6e3x9fn5+fn59fHt6eXl5eXp6e3x9fX5+fn19fHx7enp5eXl5eXl6ent8fH19fX19fHx7e3p6eXl5eXp6ent7fHx8fHx8fHx7e3t7enp6enp6ent7e3x8fHx8fHx8e3t7e3t7e3t7e3t7e3t8fHx8fHx8fHx8fHx8fHt7e3t7e3t7e3t7fHx8fHx8fHx8fHx8fHx8fHx8fHx8',
-  // Distinct notification sound
-  notification: 'data:audio/wav;base64,UklGRpQGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YSAGAACAgoKEhomNkJSXmpydn5+enJqXlJCNiYWCgH9+fn5/gIGDhYiKjI6QkZKSkpGQj42LiIaCgH9+fn5+f4CBg4WGiImKi4uLiomIhoWDgYB/fn5+fn9/gIGCg4SFhoaGhoaFhIOCgYB/fn5+fn5/f4CAgYKCg4OEhISEg4OCgYGAgH9/fn5+fn9/gICBgYKCgoKCgoKCgYGBgICAf39/f39/f4CAgIGBgYGBgYGBgYGBgYCAgICAf39/f39/f4CAgICAgYGBgYGBgYGBgYGAgICAgH9/f39/f39/',
-  // Positive success sound
-  success: 'data:audio/wav;base64,UklGRrQGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YUAGAACAf35+fn+AgYOFh4mLjI2Oj4+Pj46NjIqIhoSCgH9+fX19fn+AgYOEhoiJioqLi4uLiomIh4WEgoGAf35+fn5+f4CBgoSFhoiIiYmKiYmIh4aFhIOCgYB/fn5+fn5/f4CBgoOEhYaGh4eHhoaFhIOCgYGAf39+fn5+fn+AgIGCg4OEhYWFhYWFhISEg4KCgYGAf39/fn5+fn9/gICBgoKDg4SEhISEhIODg4KCgYGAf3+Af39/f39/gICAgYGCgoKDg4ODg4ODgoKCgYGBgICAf39/f39/f4CAgIGBgYKCgoKCgoKCgoGBgYGAgIB/',
-  // Neutral error/warning sound
-  error: 'data:audio/wav;base64,UklGRoQGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YRAGAACAgoSDgH59fX6AhIiMj5GTlJOSj4yIhIB9e3t8f4OHi46RkpOTkpCNiYWBfnt6e36ChomMj5GSk5KRj4yIhIF+e3p7foGFiYyPkZKSkpGPjIiEgX56ent+goaJjI+RkpKRkI6LiISBfnt6e32BhYmMj5GSkpGQjouIhIF+fHt7foKGiYyPkZKSkZCOi4iFgX58e3t+goWJjI+RkpKRkI6LiIWBfnx7e36ChomMj5GSkpGQjouIhYF+fHt7foKFiYyPkZKSkZCOi4iFgX58e3t+goWJjI8=',
-  // Short click feedback
-  click: 'data:audio/wav;base64,UklGRiQGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAGAACAf39/f4CAgICAgYGBgYGBgYGBgYGAgICAgH9/f39/f39/f39/gICAgICAgICAgICAgICAgH9/f39/f39/f39/gICAgICAgICAgICAgH9/f39/f39/f39/f4CAgICAgICAgICAgIB/f39/f39/f39/f3+AgICAgICAgICAgICAf39/f39/f39/f39/gICAgICAgICAgICAgH9/f39/f39/f39/f4CAgICAgICAgICAgIB/f39/f39/f39/f3+AgICAgICAgICAgICAf39/f39/f39/f39/',
+// Sound generator functions using Web Audio API synthesis
+// These create more modern, pleasant sounds programmatically
+interface SoundConfig {
+  frequencies: number[]
+  durations: number[]
+  gains: number[]
+  type: OscillatorType
+  fadeOut?: boolean
+}
+
+const SOUND_CONFIGS: Record<SoundType, SoundConfig> = {
+  // Modern message sound - soft ascending chime with harmonics
+  message: {
+    frequencies: [523.25, 659.25, 783.99], // C5, E5, G5 - major chord
+    durations: [0.15, 0.15, 0.25],
+    gains: [0.3, 0.25, 0.2],
+    type: 'sine',
+    fadeOut: true,
+  },
+  // Notification sound - pleasant bell-like tone with shimmer
+  notification: {
+    frequencies: [880, 1108.73, 1318.51, 880], // A5, C#6, E6, A5 - bright arpeggio
+    durations: [0.12, 0.12, 0.12, 0.3],
+    gains: [0.25, 0.2, 0.18, 0.15],
+    type: 'sine',
+    fadeOut: true,
+  },
+  // Success sound - uplifting rising tones
+  success: {
+    frequencies: [523.25, 659.25, 783.99, 1046.5], // C5, E5, G5, C6 - rising major
+    durations: [0.1, 0.1, 0.1, 0.35],
+    gains: [0.2, 0.22, 0.24, 0.2],
+    type: 'sine',
+    fadeOut: true,
+  },
+  // Error sound - gentle but noticeable descending tone
+  error: {
+    frequencies: [440, 349.23, 293.66], // A4, F4, D4 - descending
+    durations: [0.15, 0.15, 0.25],
+    gains: [0.25, 0.22, 0.18],
+    type: 'triangle',
+    fadeOut: true,
+  },
+  // Click sound - subtle pop
+  click: {
+    frequencies: [1200, 800],
+    durations: [0.03, 0.05],
+    gains: [0.15, 0.08],
+    type: 'sine',
+    fadeOut: true,
+  },
 }
 
 interface UseSoundOptions {
@@ -24,69 +63,75 @@ interface UseSoundOptions {
 }
 
 export function useSound(options: UseSoundOptions = {}) {
-  const { enabled = true, volume = 0.3 } = options
+  const { enabled = true, volume = 0.4 } = options
   const audioContextRef = useRef<AudioContext | null>(null)
-  const audioBuffersRef = useRef<Map<SoundType, AudioBuffer>>(new Map())
 
-  // Initialize audio context and preload sounds
-  useEffect(() => {
-    if (!enabled || typeof window === 'undefined') return
+  // Initialize audio context on first interaction
+  const ensureContext = useCallback(() => {
+    if (typeof window === 'undefined') return null
 
-    const initAudio = async () => {
-      try {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)()
-
-        // Preload all sounds
-        for (const [type, dataUri] of Object.entries(SOUNDS)) {
-          try {
-            const response = await fetch(dataUri)
-            const arrayBuffer = await response.arrayBuffer()
-            const audioBuffer = await audioContextRef.current.decodeAudioData(arrayBuffer)
-            audioBuffersRef.current.set(type as SoundType, audioBuffer)
-          } catch (error) {
-            console.warn(`[Sound] Failed to load ${type}:`, error)
-          }
-        }
-      } catch (error) {
-        console.warn('[Sound] Audio context not supported:', error)
-      }
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)()
     }
 
-    initAudio()
+    // Resume if suspended (browser autoplay policy)
+    if (audioContextRef.current.state === 'suspended') {
+      audioContextRef.current.resume()
+    }
 
+    return audioContextRef.current
+  }, [])
+
+  // Cleanup on unmount
+  useEffect(() => {
     return () => {
       if (audioContextRef.current) {
         audioContextRef.current.close()
+        audioContextRef.current = null
       }
     }
-  }, [enabled])
+  }, [])
 
   const play = useCallback((type: SoundType) => {
-    if (!enabled || !audioContextRef.current) return
+    if (!enabled) return
 
-    const buffer = audioBuffersRef.current.get(type)
-    if (!buffer) return
+    const ctx = ensureContext()
+    if (!ctx) return
+
+    const config = SOUND_CONFIGS[type]
+    const now = ctx.currentTime
+    let timeOffset = 0
 
     try {
-      // Resume audio context if suspended (browser autoplay policy)
-      if (audioContextRef.current.state === 'suspended') {
-        audioContextRef.current.resume()
-      }
+      config.frequencies.forEach((freq, i) => {
+        const oscillator = ctx.createOscillator()
+        const gainNode = ctx.createGain()
 
-      const source = audioContextRef.current.createBufferSource()
-      const gainNode = audioContextRef.current.createGain()
+        oscillator.type = config.type
+        oscillator.frequency.setValueAtTime(freq, now + timeOffset)
 
-      source.buffer = buffer
-      gainNode.gain.value = volume
+        // Set initial gain
+        const gain = config.gains[i] * volume
+        gainNode.gain.setValueAtTime(gain, now + timeOffset)
 
-      source.connect(gainNode)
-      gainNode.connect(audioContextRef.current.destination)
+        // Apply fade out for smoother sound
+        if (config.fadeOut) {
+          const duration = config.durations[i]
+          gainNode.gain.exponentialRampToValueAtTime(0.001, now + timeOffset + duration)
+        }
 
-      source.start(0)
+        oscillator.connect(gainNode)
+        gainNode.connect(ctx.destination)
+
+        oscillator.start(now + timeOffset)
+        oscillator.stop(now + timeOffset + config.durations[i])
+
+        timeOffset += config.durations[i] * 0.6 // Overlap notes slightly
+      })
     } catch (error) {
       console.warn('[Sound] Playback error:', error)
     }
-  }, [enabled, volume])
+  }, [enabled, volume, ensureContext])
 
   return { play }
 }
@@ -108,4 +153,40 @@ export function useSoundNotifications(soundEnabled: boolean = true) {
     playError,
     playClick,
   }
+}
+
+// Sound toggle hook with localStorage persistence
+const SOUND_STORAGE_KEY = 'kopro-sound-enabled'
+
+export function useSoundToggle(initialEnabled: boolean = true) {
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return initialEnabled
+    const stored = localStorage.getItem(SOUND_STORAGE_KEY)
+    return stored !== null ? stored === 'true' : initialEnabled
+  })
+
+  const toggleSound = useCallback(() => {
+    setSoundEnabled(prev => {
+      const newValue = !prev
+      localStorage.setItem(SOUND_STORAGE_KEY, String(newValue))
+      return newValue
+    })
+  }, [])
+
+  const setSound = useCallback((enabled: boolean) => {
+    setSoundEnabled(enabled)
+    localStorage.setItem(SOUND_STORAGE_KEY, String(enabled))
+  }, [])
+
+  // Sync with server preference on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(SOUND_STORAGE_KEY)
+      if (stored !== null) {
+        setSoundEnabled(stored === 'true')
+      }
+    }
+  }, [])
+
+  return { soundEnabled, toggleSound, setSound }
 }

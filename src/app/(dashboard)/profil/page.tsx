@@ -1,19 +1,18 @@
 import { requireAuth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { formatDate, formatDateTime } from '@/lib/utils'
 import { ProfileForm } from './profile-form'
 import { AvatarUpload } from './avatar-upload'
 import { PreferencesForm } from './preferences-form'
+import { SecurityForm } from './security-form'
 import {
   User,
-  Mail,
-  Phone,
-  MapPin,
   Calendar,
   Shield,
   Clock,
   Settings,
+  ImageIcon,
 } from 'lucide-react'
 
 export default async function ProfilePage() {
@@ -48,122 +47,129 @@ export default async function ProfilePage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
+    <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Mon profil</h1>
-        <p className="text-gray-600 mt-1">
+        <h1 className="text-3xl font-bold text-kopro-dark">Mon profil</h1>
+        <p className="text-kopro-grey mt-2 text-lg">
           Gérez vos informations personnelles
         </p>
       </div>
 
-      {/* Avatar & Quick Info */}
-      <Card>
-        <CardContent className="py-6">
-          <div className="flex flex-col sm:flex-row items-center gap-6">
+      {/* Two column layout for avatar and quick info */}
+      <div className="grid md:grid-cols-2 gap-6">
+        {/* Avatar Card */}
+        <Card>
+          <CardContent className="py-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 bg-accent-light rounded-lg">
+                <ImageIcon className="h-5 w-5 text-accent" />
+              </div>
+              <h2 className="text-lg font-semibold text-kopro-dark">Photo de profil</h2>
+            </div>
             <AvatarUpload
               userId={fullUser.id}
               currentAvatarUrl={fullUser.avatarUrl}
               firstName={fullUser.firstName}
               lastName={fullUser.lastName}
             />
-            <div className="text-center sm:text-left">
-              <h2 className="text-xl font-bold text-gray-900">
-                {fullUser.firstName} {fullUser.lastName}
-              </h2>
-              <p className="text-gray-600">{fullUser.email}</p>
-              <div className="flex items-center justify-center sm:justify-start gap-4 mt-3 text-sm text-gray-500">
-                <span className="flex items-center gap-1">
+          </CardContent>
+        </Card>
+
+        {/* Quick Info Card */}
+        <Card>
+          <CardContent className="py-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 bg-accent-light rounded-lg">
+                <User className="h-5 w-5 text-accent" />
+              </div>
+              <h2 className="text-lg font-semibold text-kopro-dark">Aperçu du compte</h2>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-kopro-grey uppercase tracking-wide mb-1">Nom complet</p>
+                <p className="text-lg font-medium text-kopro-dark">
+                  {fullUser.firstName} {fullUser.lastName}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-kopro-grey uppercase tracking-wide mb-1">Adresse email</p>
+                <p className="text-lg font-medium text-kopro-dark">{fullUser.email}</p>
+              </div>
+              <div className="pt-4 border-t border-gray-100">
+                <div className="flex items-center gap-2 text-sm text-kopro-grey">
                   <Calendar className="h-4 w-4" />
-                  Membre depuis {formatDate(fullUser.createdAt)}
-                </span>
+                  <span>Membre depuis {formatDate(fullUser.createdAt)}</span>
+                </div>
+                {fullUser.lastLoginAt && (
+                  <div className="flex items-center gap-2 text-sm text-kopro-grey mt-2">
+                    <Clock className="h-4 w-4" />
+                    <span>Dernière connexion : {formatDateTime(fullUser.lastLoginAt)}</span>
+                  </div>
+                )}
               </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
 
-      {/* Profile Form */}
+      {/* Profile Form - Full width */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <User className="h-5 w-5" />
-            Informations personnelles
-          </CardTitle>
-          <CardDescription>
-            Mettez à jour vos informations de contact et d'adresse
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="py-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 bg-accent-light rounded-lg">
+              <User className="h-5 w-5 text-accent" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-kopro-dark">Informations personnelles</h2>
+              <p className="text-sm text-kopro-grey">Mettez à jour vos informations de contact et d'adresse</p>
+            </div>
+          </div>
           <ProfileForm user={fullUser} />
         </CardContent>
       </Card>
 
-      {/* Security Info */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="h-5 w-5" />
-            Sécurité du compte
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
-                <Mail className="h-4 w-4" />
-                Adresse email
+      {/* Two column layout for security and preferences */}
+      <div className="grid md:grid-cols-2 gap-6">
+        {/* Security Card */}
+        <Card>
+          <CardContent className="py-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 bg-accent-light rounded-lg">
+                <Shield className="h-5 w-5 text-accent" />
               </div>
-              <p className="font-medium text-gray-900">{fullUser.email}</p>
-              <p className="text-xs text-gray-500 mt-1">
-                L'email ne peut pas être modifié pour des raisons de sécurité
-              </p>
-            </div>
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
-                <Clock className="h-4 w-4" />
-                Dernière connexion
+              <div>
+                <h2 className="text-lg font-semibold text-kopro-dark">Sécurité</h2>
+                <p className="text-sm text-kopro-grey">Email et mot de passe</p>
               </div>
-              <p className="font-medium text-gray-900">
-                {fullUser.lastLoginAt
-                  ? formatDateTime(fullUser.lastLoginAt)
-                  : 'Première connexion'}
-              </p>
             </div>
-          </div>
+            <SecurityForm userId={fullUser.id} currentEmail={fullUser.email} />
+          </CardContent>
+        </Card>
 
-          <div className="p-4 bg-amber-50 border border-amber-100 rounded-lg">
-            <p className="text-sm text-amber-800">
-              <strong>Besoin de changer votre mot de passe ?</strong>
-              <br />
-              Contactez votre conseiller KOPRO pour réinitialiser votre mot de passe en toute sécurité.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Preferences */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Settings className="h-5 w-5" />
-            Préférences
-          </CardTitle>
-          <CardDescription>
-            Personnalisez votre expérience sur KOPRO
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <PreferencesForm
-            userId={fullUser.id}
-            preferences={{
-              soundEnabled: fullUser.soundEnabled,
-              emailNotifications: fullUser.emailNotifications,
-              pushNotifications: fullUser.pushNotifications,
-              preferredChannel: fullUser.preferredChannel,
-            }}
-          />
-        </CardContent>
-      </Card>
+        {/* Preferences Card */}
+        <Card>
+          <CardContent className="py-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 bg-accent-light rounded-lg">
+                <Settings className="h-5 w-5 text-accent" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-kopro-dark">Préférences</h2>
+                <p className="text-sm text-kopro-grey">Personnalisez votre expérience</p>
+              </div>
+            </div>
+            <PreferencesForm
+              userId={fullUser.id}
+              preferences={{
+                soundEnabled: fullUser.soundEnabled,
+                emailNotifications: fullUser.emailNotifications,
+                pushNotifications: fullUser.pushNotifications,
+                preferredChannel: fullUser.preferredChannel,
+              }}
+            />
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

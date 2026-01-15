@@ -4,19 +4,17 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import {
-  LayoutDashboard,
+  Home,
   FileText,
-  MessageSquare,
-  Bell,
-  Settings,
   LogOut,
   User,
   HelpCircle,
-  ChevronLeft,
-  Menu,
+  LayoutDashboard,
+  MessageSquare,
+  ChevronRight,
 } from 'lucide-react'
-import { useState } from 'react'
-import { Button } from '@/components/ui/button'
+import { useUserAvatar } from '@/contexts/user-avatar-context'
+import { useSoundToggle, useSound } from '@/hooks/use-sound'
 
 interface SidebarProps {
   user: {
@@ -32,19 +30,26 @@ interface SidebarProps {
   } | null
   unreadNotifications?: number
   unreadMessages?: number
+  hasActionRequired?: boolean
 }
 
-export function Sidebar({ user, dossier, unreadNotifications = 0, unreadMessages = 0 }: SidebarProps) {
+export function Sidebar({ user, dossier, unreadMessages = 0, hasActionRequired = false }: SidebarProps) {
   const pathname = usePathname()
-  const [isCollapsed, setIsCollapsed] = useState(false)
+  const { avatarUrl } = useUserAvatar()
+  const { soundEnabled } = useSoundToggle()
+  const { play } = useSound({ enabled: soundEnabled })
 
-  const isAdmin = user.role === 'ADMIN' || user.role === 'ADVISOR'
+  const handleNavClick = () => {
+    play('click')
+  }
+
+  const isAdmin = user.role === 'ADMIN'
 
   const clientNavItems = [
     {
       href: '/dashboard',
-      label: 'Tableau de bord',
-      icon: LayoutDashboard,
+      label: 'Accueil',
+      icon: Home,
     },
     ...(dossier
       ? [
@@ -52,30 +57,19 @@ export function Sidebar({ user, dossier, unreadNotifications = 0, unreadMessages
             href: `/dossier/${dossier.id}`,
             label: 'Mon dossier',
             icon: FileText,
+            ...(hasActionRequired && { badge: 1 }),
           },
         ]
       : []),
     {
-      href: '/documents',
-      label: 'Mes documents',
-      icon: FileText,
-    },
-    {
-      href: '/messages',
-      label: 'Messages',
-      icon: MessageSquare,
-      badge: unreadMessages,
-    },
-    {
-      href: '/notifications',
-      label: 'Notifications',
-      icon: Bell,
-      badge: unreadNotifications,
-    },
-    {
       href: '/profil',
       label: 'Mon profil',
       icon: User,
+    },
+    {
+      href: '/support',
+      label: 'Aide & support',
+      icon: HelpCircle,
     },
   ]
 
@@ -106,146 +100,132 @@ export function Sidebar({ user, dossier, unreadNotifications = 0, unreadMessages
   const navItems = isAdmin ? adminNavItems : clientNavItems
 
   return (
-    <>
-      {/* Mobile overlay */}
-      <div
-        className={cn(
-          'fixed inset-0 bg-black/50 z-40 lg:hidden transition-opacity',
-          isCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
-        )}
-        onClick={() => setIsCollapsed(true)}
-      />
+    <aside className="fixed lg:sticky top-0 left-0 z-50 h-screen w-72 bg-white flex flex-col border-r border-primary-100">
+      {/* Header with Logo */}
+      <div className="px-5 py-6">
+        <Link href={isAdmin ? '/admin' : '/dashboard'} className="flex items-center group">
+          <img
+            src="/logo.svg"
+            alt="KOPRO"
+            className="h-10 transition-transform duration-200 group-hover:scale-95"
+          />
+        </Link>
 
-      {/* Sidebar */}
-      <aside
-        className={cn(
-          'fixed lg:sticky top-0 left-0 z-50 h-screen bg-white border-r border-gray-200 transition-all duration-300 flex flex-col',
-          isCollapsed ? '-translate-x-full lg:translate-x-0 lg:w-20' : 'translate-x-0 w-64'
-        )}
-      >
-        {/* Header */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-gray-200">
-          {!isCollapsed && (
-            <Link href={isAdmin ? '/admin' : '/dashboard'} className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">K</span>
+        {/* Separator */}
+        <div className="h-px bg-primary-100 mt-5" />
+      </div>
+
+      {/* Navigation Section Title */}
+      <div className="px-5 mb-2">
+        <p className="text-xs font-medium text-kopro-grey uppercase tracking-wider">
+          Tableau de bord
+        </p>
+      </div>
+
+      {/* Navigation Links */}
+      <nav className="flex-1 px-3 space-y-1 overflow-y-auto">
+        {navItems.map((item) => {
+          const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+          const Icon = item.icon
+
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={handleNavClick}
+              className={cn(
+                'flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 relative group',
+                isActive
+                  ? 'bg-accent-light text-accent font-medium'
+                  : 'text-kopro-dark hover:bg-accent-light/50 hover:text-accent'
+              )}
+            >
+              <div className={cn(
+                'w-9 h-9 rounded-xl flex items-center justify-center transition-colors',
+                isActive ? 'bg-accent text-white' : 'bg-primary-50 text-kopro-grey group-hover:bg-accent group-hover:text-white'
+              )}>
+                <Icon className="h-5 w-5" />
               </div>
-              <span className="font-bold text-lg text-gray-900">KOPRO</span>
-            </Link>
-          )}
-          <button
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="p-2 rounded-lg hover:bg-gray-100 text-gray-500"
-          >
-            {isCollapsed ? (
-              <Menu className="h-5 w-5" />
-            ) : (
-              <ChevronLeft className="h-5 w-5" />
-            )}
-          </button>
-        </div>
-
-        {/* User info */}
-        {!isCollapsed && (
-          <div className="p-4 border-b border-gray-200">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
-                <span className="text-primary-700 font-semibold">
-                  {user.firstName[0]}{user.lastName[0]}
+              <span className="flex-1">{item.label}</span>
+              {item.badge && item.badge > 0 ? (
+                <span className="bg-kopro-required text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                  {item.badge}
                 </span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-gray-900 truncate">
-                  {user.firstName} {user.lastName}
-                </p>
-                <p className="text-xs text-gray-500 truncate">{user.email}</p>
-              </div>
-            </div>
-            {dossier && !isAdmin && (
-              <div className="mt-3 p-2 bg-primary-50 rounded-lg">
-                <p className="text-xs text-primary-600 font-medium">Dossier</p>
-                <p className="text-sm font-bold text-primary-700">{dossier.reference}</p>
-              </div>
-            )}
-          </div>
-        )}
+              ) : (
+                <ChevronRight className={cn(
+                  'h-4 w-4 transition-colors',
+                  isActive ? 'text-accent' : 'text-kopro-grey'
+                )} />
+              )}
+            </Link>
+          )
+        })}
+      </nav>
 
-        {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          {navItems.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-            const Icon = item.icon
+      {/* Bottom Section */}
+      <div className="mt-auto">
+        {/* Separator */}
+        <div className="h-px bg-primary-100 mx-5" />
 
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors relative',
-                  isActive
-                    ? 'bg-primary-50 text-primary-700'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                )}
-              >
-                <Icon className={cn('h-5 w-5 flex-shrink-0', isActive && 'text-primary-600')} />
-                {!isCollapsed && (
-                  <>
-                    <span className="font-medium">{item.label}</span>
-                    {item.badge && item.badge > 0 && (
-                      <span className="ml-auto bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                        {item.badge}
-                      </span>
-                    )}
-                  </>
-                )}
-                {isCollapsed && item.badge && item.badge > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
-                    {item.badge > 9 ? '9+' : item.badge}
-                  </span>
-                )}
-              </Link>
-            )
-          })}
-        </nav>
-
-        {/* Footer */}
-        <div className="p-4 border-t border-gray-200 space-y-1">
-          {!isCollapsed && (
-            <>
-              <Link
-                href="/support"
-                className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-              >
-                <HelpCircle className="h-5 w-5" />
-                <span className="font-medium">Support & Aide</span>
-              </Link>
-            </>
-          )}
+        {/* Logout Section */}
+        <div className="px-5 py-3">
+          <p className="text-[10px] font-medium text-kopro-grey/60 uppercase tracking-wider mb-1.5">
+            Autre
+          </p>
           <form action="/api/auth/logout" method="POST">
             <button
               type="submit"
-              className={cn(
-                'flex items-center gap-3 px-3 py-2 rounded-lg text-gray-600 hover:bg-red-50 hover:text-red-600 w-full',
-                isCollapsed && 'justify-center'
-              )}
+              className="flex items-center gap-2 w-full text-kopro-grey hover:text-accent transition-colors py-1.5"
             >
-              <LogOut className="h-5 w-5" />
-              {!isCollapsed && <span className="font-medium">Déconnexion</span>}
+              <LogOut className="h-4 w-4" />
+              <span className="text-sm">Se déconnecter</span>
             </button>
           </form>
         </div>
-      </aside>
 
-      {/* Mobile toggle button */}
-      <button
-        onClick={() => setIsCollapsed(false)}
-        className={cn(
-          'fixed bottom-4 left-4 z-30 lg:hidden p-3 bg-primary-600 text-white rounded-full shadow-lg',
-          !isCollapsed && 'hidden'
-        )}
-      >
-        <Menu className="h-6 w-6" />
-      </button>
-    </>
+        {/* Separator */}
+        <div className="h-px bg-primary-100 mx-5" />
+
+        {/* User Profile Card */}
+        <Link
+          href="/profil"
+          onClick={handleNavClick}
+          className="flex items-center gap-3 p-4 m-3 rounded-xl"
+        >
+          {/* Avatar with violet border */}
+          <div className="relative flex-shrink-0">
+            <div className="rounded-full border-2 border-accent w-12 h-12 overflow-hidden">
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt={`${user.firstName} ${user.lastName}`}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-accent to-primary-400 flex items-center justify-center text-white font-semibold text-sm">
+                  {user.firstName[0]}{user.lastName[0]}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* User Info */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5">
+              <p className="font-semibold text-kopro-dark truncate">
+                {user.firstName} {user.lastName}
+              </p>
+              <img src="/verified-badge.svg" alt="Vérifié" className="h-4 w-4 flex-shrink-0" />
+            </div>
+            <p className="text-sm text-kopro-grey truncate">
+              {user.email}
+            </p>
+          </div>
+
+          {/* Arrow */}
+          <ChevronRight className="h-4 w-4 text-kopro-grey flex-shrink-0" />
+        </Link>
+      </div>
+    </aside>
   )
 }

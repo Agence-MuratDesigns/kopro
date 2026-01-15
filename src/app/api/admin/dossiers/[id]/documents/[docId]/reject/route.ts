@@ -9,7 +9,7 @@ interface Context {
 export async function POST(request: NextRequest, context: Context) {
   try {
     const session = await getSession()
-    if (!session || !['ADMIN', 'ADVISOR'].includes(session.role)) {
+    if (!session || !['ADMIN'].includes(session.role)) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 401 })
     }
 

@@ -99,8 +99,8 @@ export default async function DocumentsPage() {
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-fade-in">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Mes documents</h1>
-        <p className="text-gray-600 mt-1">
+        <h1 className="text-3xl font-bold text-kopro-dark">Mes documents</h1>
+        <p className="text-kopro-grey mt-2 text-lg">
           Retrouvez tous les documents liés à vos dossiers de rénovation
         </p>
       </div>

@@ -2,8 +2,9 @@
 
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { Loader2, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Camera, Loader2, User } from 'lucide-react'
+import { useUserAvatar } from '@/contexts/user-avatar-context'
 
 interface AvatarUploadProps {
   userId: string
@@ -21,9 +22,12 @@ export function AvatarUpload({
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isUploading, setIsUploading] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [error, setError] = useState('')
+  const { avatarUrl, setAvatarUrl } = useUserAvatar()
 
   const initials = `${firstName[0]}${lastName[0]}`.toUpperCase()
+  const displayAvatarUrl = avatarUrl ?? currentAvatarUrl
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -48,7 +52,7 @@ export function AvatarUpload({
       const formData = new FormData()
       formData.append('avatar', file)
 
-      const response = await fetch('/api/user/avatar', {
+      const response = await fetch('/api/profile/avatar', {
         method: 'POST',
         body: formData,
       })
@@ -59,6 +63,11 @@ export function AvatarUpload({
         return
       }
 
+      const data = await response.json()
+      // Update the avatar context to sync with sidebar
+      if (data.avatarUrl) {
+        setAvatarUrl(data.avatarUrl)
+      }
       router.refresh()
     } catch {
       setError('Erreur de connexion au serveur')
@@ -71,34 +80,95 @@ export function AvatarUpload({
     }
   }
 
-  return (
-    <div className="relative group">
-      {/* Avatar */}
-      <div className="w-24 h-24 rounded-full overflow-hidden bg-primary-100 flex items-center justify-center">
-        {currentAvatarUrl ? (
-          <img
-            src={currentAvatarUrl}
-            alt={`${firstName} ${lastName}`}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <span className="text-3xl font-bold text-primary-700">{initials}</span>
-        )}
-      </div>
+  const handleDelete = async () => {
+    if (!displayAvatarUrl) return
 
-      {/* Upload overlay */}
-      <button
-        type="button"
-        onClick={() => fileInputRef.current?.click()}
-        disabled={isUploading}
-        className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-      >
-        {isUploading ? (
-          <Loader2 className="h-6 w-6 text-white animate-spin" />
-        ) : (
-          <Camera className="h-6 w-6 text-white" />
-        )}
-      </button>
+    setIsDeleting(true)
+    setError('')
+
+    try {
+      const response = await fetch('/api/profile/avatar', {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        setError(data.error || 'Erreur lors de la suppression')
+        return
+      }
+
+      // Clear the avatar in context
+      setAvatarUrl(null)
+      router.refresh()
+    } catch {
+      setError('Erreur de connexion au serveur')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Avatar and Actions */}
+      <div className="flex items-center gap-6">
+        {/* Large Avatar */}
+        <div className={`w-24 h-24 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0 border-2 ${
+          displayAvatarUrl
+            ? 'bg-white border-gray-200'
+            : 'bg-gradient-to-br from-accent to-primary-400 border-accent'
+        }`}>
+          {displayAvatarUrl ? (
+            <img
+              src={displayAvatarUrl}
+              alt={`${firstName} ${lastName}`}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <span className="text-3xl font-bold text-white">{initials}</span>
+          )}
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex flex-col gap-2">
+          <Button
+            type="button"
+            variant="primary"
+            size="md"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading || isDeleting}
+          >
+            {isUploading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Envoi en cours...
+              </>
+            ) : (
+              "Remplacer l'avatar"
+            )}
+          </Button>
+
+          {displayAvatarUrl && (
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={isUploading || isDeleting}
+              className="flex items-center gap-2 text-sm text-kopro-grey hover:text-kopro-dark transition-colors disabled:opacity-50"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Suppression...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4" />
+                  Supprimer
+                </>
+              )}
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* Hidden file input */}
       <input
@@ -111,14 +181,14 @@ export function AvatarUpload({
 
       {/* Error message */}
       {error && (
-        <p className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs text-red-600 whitespace-nowrap">
+        <p className="text-sm text-kopro-required">
           {error}
         </p>
       )}
 
-      {/* Upload hint */}
-      <p className="absolute -bottom-8 left-1/2 -translate-x-1/2 text-xs text-gray-500 whitespace-nowrap group-hover:opacity-0">
-        JPG/PNG, max 2 Mo
+      {/* Format hint */}
+      <p className="text-xs text-kopro-grey">
+        Formats acceptés : JPG, PNG. Taille maximale : 2 Mo
       </p>
     </div>
   )

@@ -134,14 +134,14 @@ export function PreferencesForm({ userId, preferences }: PreferencesFormProps) {
           </div>
           <div
             className={cn(
-              'w-12 h-6 rounded-full transition-colors relative',
+              'w-11 h-6 rounded-full transition-colors relative flex-shrink-0',
               formData.soundEnabled ? 'bg-primary-600' : 'bg-gray-300'
             )}
           >
             <div
               className={cn(
-                'absolute top-1 w-4 h-4 bg-white rounded-full transition-transform',
-                formData.soundEnabled ? 'translate-x-7' : 'translate-x-1'
+                'absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform shadow-sm',
+                formData.soundEnabled ? 'translate-x-5' : 'translate-x-0'
               )}
             />
           </div>
@@ -178,14 +178,14 @@ export function PreferencesForm({ userId, preferences }: PreferencesFormProps) {
           </div>
           <div
             className={cn(
-              'w-12 h-6 rounded-full transition-colors relative',
+              'w-11 h-6 rounded-full transition-colors relative flex-shrink-0',
               formData.pushNotifications ? 'bg-primary-600' : 'bg-gray-300'
             )}
           >
             <div
               className={cn(
-                'absolute top-1 w-4 h-4 bg-white rounded-full transition-transform',
-                formData.pushNotifications ? 'translate-x-7' : 'translate-x-1'
+                'absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform shadow-sm',
+                formData.pushNotifications ? 'translate-x-5' : 'translate-x-0'
               )}
             />
           </div>
@@ -213,14 +213,14 @@ export function PreferencesForm({ userId, preferences }: PreferencesFormProps) {
           </div>
           <div
             className={cn(
-              'w-12 h-6 rounded-full transition-colors relative',
+              'w-11 h-6 rounded-full transition-colors relative flex-shrink-0',
               formData.emailNotifications ? 'bg-primary-600' : 'bg-gray-300'
             )}
           >
             <div
               className={cn(
-                'absolute top-1 w-4 h-4 bg-white rounded-full transition-transform',
-                formData.emailNotifications ? 'translate-x-7' : 'translate-x-1'
+                'absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform shadow-sm',
+                formData.emailNotifications ? 'translate-x-5' : 'translate-x-0'
               )}
             />
           </div>

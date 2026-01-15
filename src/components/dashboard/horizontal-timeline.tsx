@@ -27,9 +27,9 @@ function getStepIcon(status: string) {
 function getStepStyles(status: string, isAdminOnly: boolean) {
   if (status === 'VALIDATED') {
     return {
-      circle: 'bg-green-500 text-white border-green-500',
-      line: 'bg-green-500',
-      text: 'text-green-700',
+      circle: 'bg-kopro-success text-white border-kopro-success',
+      line: 'bg-kopro-success',
+      text: 'text-kopro-success',
     }
   }
   if (status === 'LOCKED') {
@@ -41,25 +41,23 @@ function getStepStyles(status: string, isAdminOnly: boolean) {
   }
   if (status === 'BLOCKED') {
     return {
-      circle: 'bg-red-500 text-white border-red-500',
+      circle: 'bg-kopro-required text-white border-kopro-required',
       line: 'bg-gray-200',
-      text: 'text-red-600',
+      text: 'text-kopro-required',
     }
   }
   if (status === 'PENDING_VALIDATION') {
     return {
-      circle: 'bg-amber-500 text-white border-amber-500 animate-pulse',
+      circle: 'bg-accent text-white border-accent',
       line: 'bg-gray-200',
-      text: 'text-amber-700',
+      text: 'text-accent',
     }
   }
   if (status === 'IN_PROGRESS' || status === 'AVAILABLE') {
     return {
-      circle: isAdminOnly
-        ? 'bg-purple-500 text-white border-purple-500'
-        : 'bg-blue-500 text-white border-blue-500',
+      circle: 'bg-primary-600 text-white border-primary-600',
       line: 'bg-gray-200',
-      text: isAdminOnly ? 'text-purple-700' : 'text-blue-700',
+      text: 'text-primary-600',
     }
   }
   return {
@@ -82,8 +80,8 @@ export function HorizontalTimeline({ steps, dossierId, currentStepId }: Horizont
             const styles = getStepStyles(step.status, step.template.adminOnly)
 
             const stepContent = (
-              <div className="flex-1 relative">
-                <div className="flex items-center">
+              <div className="flex-1 relative flex flex-col items-center">
+                <div className="flex items-center w-full justify-center">
                   {/* Circle */}
                   <div
                     className={cn(
@@ -110,7 +108,7 @@ export function HorizontalTimeline({ steps, dossierId, currentStepId }: Horizont
                       className={cn(
                         'flex-1 h-1 mx-1',
                         index < steps.findIndex(s => s.status !== 'VALIDATED')
-                          ? 'bg-green-500'
+                          ? 'bg-kopro-success'
                           : 'bg-gray-200'
                       )}
                     />
@@ -118,10 +116,10 @@ export function HorizontalTimeline({ steps, dossierId, currentStepId }: Horizont
                 </div>
 
                 {/* Label */}
-                <div className="mt-2 max-w-[100px]">
+                <div className="mt-2 w-full flex flex-col items-center">
                   <p
                     className={cn(
-                      'text-xs font-medium text-center truncate',
+                      'text-xs font-medium text-center truncate max-w-[100px]',
                       styles.text
                     )}
                     title={step.template.name}
@@ -188,7 +186,7 @@ export function HorizontalTimeline({ steps, dossierId, currentStepId }: Horizont
                     className={cn(
                       'w-4 h-0.5 flex-shrink-0',
                       index < steps.findIndex(s => s.status !== 'VALIDATED')
-                        ? 'bg-green-500'
+                        ? 'bg-kopro-success'
                         : 'bg-gray-200'
                     )}
                   />

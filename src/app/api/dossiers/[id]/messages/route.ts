@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { notifyAdminsOfClientAction, sendEventToUser } from '@/lib/realtime'
 
 interface Context {
   params: Promise<{ id: string }>
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest, context: Context) {
 
     // Verify user has access
     const isClient = session.userId === dossier.clientId
-    const isAdvisor = session.role === 'ADMIN' || session.role === 'ADVISOR'
+    const isAdvisor = session.role === 'ADMIN'
 
     if (!isClient && !isAdvisor) {
       return NextResponse.json({ error: 'Non autorisé' }, { status: 403 })
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest, context: Context) {
         content: body.content.trim(),
         senderId: session.userId,
         dossierId: id,
-        isFromClient: isClient,
+        messageType: isClient ? 'CLIENT' : 'ADMIN',
       },
     })
 
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest, context: Context) {
     if (isClient) {
       // Notify admins/advisors
       const staff = await prisma.user.findMany({
-        where: { role: { in: ['ADMIN', 'ADVISOR'] } },
+        where: { role: { in: ['ADMIN'] } },
       })
 
       for (const admin of staff) {
@@ -81,6 +82,26 @@ export async function POST(request: NextRequest, context: Context) {
           message: 'Vous avez reçu un nouveau message de votre conseiller.',
           link: `/messages?dossier=${id}`,
         },
+      })
+    }
+
+    // Real-time notification
+    if (isClient) {
+      // Get client name for notification
+      const client = await prisma.user.findUnique({
+        where: { id: session.userId },
+        select: { firstName: true, lastName: true },
+      })
+      notifyAdminsOfClientAction('message', {
+        dossierId: id,
+        clientName: client ? `${client.firstName} ${client.lastName}` : 'Client',
+        message: `Nouveau message sur le dossier ${dossier.reference}`,
+      })
+    } else {
+      // Notify client in real-time
+      sendEventToUser(dossier.clientId, 'message', {
+        dossierId: id,
+        message: 'Nouveau message de votre conseiller',
       })
     }
 

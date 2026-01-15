@@ -9,7 +9,7 @@ interface RouteParams {
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const { id: dossierId } = await params
-    const admin = await requireRole(['ADMIN', 'ADVISOR'])
+    const admin = await requireRole(['ADMIN'])
     const body = await request.json()
     const { action, message } = body
 
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // Find the MPR step
-    const mprStep = dossier.steps.find(s => s.template.code === 'IDENTIFIANT_MPR')
+    const mprStep = dossier.steps.find(s => s.template.code === 'MPR_IDENTIFIER')
     if (!mprStep) {
       return NextResponse.json(
         { error: 'Étape MPR non trouvée' },
@@ -186,7 +186,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             type: 'MPR_REJECTED',
             title: 'Identifiant MaPrimeRénov\' rejeté',
             message: `Votre identifiant a été rejeté : ${message}. Veuillez le corriger.`,
-            link: `/dossier/${dossierId}/etape/IDENTIFIANT_MPR`,
+            link: `/dossier/${dossierId}/etape/MPR_IDENTIFIER`,
           },
         })
 

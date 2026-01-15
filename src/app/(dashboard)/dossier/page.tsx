@@ -2,18 +2,18 @@ import { requireAuth } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
 
-export default async function DossierIndexPage() {
+export default async function DossiersListPage() {
   const user = await requireAuth()
 
-  // Get first dossier
+  // Get the client's dossier (single dossier per client)
   const dossier = await prisma.dossier.findFirst({
     where: { clientId: user.id },
-    orderBy: { createdAt: 'desc' },
   })
 
-  if (dossier) {
-    redirect(`/dossier/${dossier.id}`)
-  } else {
-    redirect('/dossier/nouveau')
+  // Redirect to dashboard if no dossier or to the dossier details
+  if (!dossier) {
+    redirect('/dashboard')
   }
+
+  redirect(`/dossier/${dossier.id}`)
 }

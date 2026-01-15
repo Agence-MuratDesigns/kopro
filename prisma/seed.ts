@@ -124,19 +124,6 @@ async function main() {
   })
   console.log('Admin user created')
 
-  // Create advisor user
-  await prisma.user.create({
-    data: {
-      email: 'conseiller@kopro.fr',
-      password: hashedPassword,
-      firstName: 'Marie',
-      lastName: 'Dupont',
-      role: 'ADVISOR',
-      mustChangePassword: false,
-    },
-  })
-  console.log('Advisor user created')
-
   // Create demo client (créé par l'admin)
   const clientPassword = await bcrypt.hash('client123', 12)
   const client = await prisma.user.create({

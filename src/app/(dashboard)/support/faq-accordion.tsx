@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronDown, LucideIcon } from 'lucide-react'
+import { ChevronDown, FileText, Euro, Home, Clock, HelpCircle, LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface FaqItem {
@@ -11,12 +11,21 @@ interface FaqItem {
 
 interface FaqCategory {
   title: string
-  icon: LucideIcon
+  icon: string
   items: FaqItem[]
 }
 
 interface FaqAccordionProps {
   categories: FaqCategory[]
+}
+
+// Mapping des icônes par nom
+const iconMap: Record<string, LucideIcon> = {
+  FileText,
+  Euro,
+  Home,
+  Clock,
+  HelpCircle,
 }
 
 export function FaqAccordion({ categories }: FaqAccordionProps) {
@@ -26,7 +35,7 @@ export function FaqAccordion({ categories }: FaqAccordionProps) {
   return (
     <div className="space-y-4">
       {categories.map((category) => {
-        const Icon = category.icon
+        const Icon = iconMap[category.icon] || HelpCircle
         const isCategoryOpen = openCategory === category.title
 
         return (

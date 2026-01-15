@@ -16,28 +16,54 @@ import {
   PenTool,
   FileText,
   Info,
+  FastForward,
 } from 'lucide-react'
 
 interface MandateSignatureFormProps {
   dossierId: string
   mandatStatus: string
-  mandatMethod: string | null
   mandatReviewMessage: string | null
 }
 
 export function MandateSignatureForm({
   dossierId,
   mandatStatus,
-  mandatMethod,
   mandatReviewMessage,
 }: MandateSignatureFormProps) {
   const router = useRouter()
-  const [isLoading, setIsLoading] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
+  const [isSkipping, setIsSkipping] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [signatureMode, setSignatureMode] = useState<'manual' | 'electronic' | null>(null)
+
+  // DEV: Skip step function
+  const handleSkipStep = async () => {
+    setIsSkipping(true)
+    setError('')
+
+    try {
+      const response = await fetch(`/api/dossiers/${dossierId}/skip-step`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stepCode: 'MANDATE_SIGNATURE' }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(data.error || 'Erreur lors du passage de l\'étape')
+        return
+      }
+
+      setSuccess('Étape passée avec succès (mode développement)')
+      router.refresh()
+    } catch {
+      setError('Erreur de connexion au serveur')
+    } finally {
+      setIsSkipping(false)
+    }
+  }
 
   const handleDownloadMandate = async () => {
     try {
@@ -76,7 +102,6 @@ export function MandateSignatureForm({
     try {
       const formData = new FormData()
       formData.append('file', selectedFile)
-      formData.append('method', 'MANUAL')
 
       const response = await fetch(`/api/dossiers/${dossierId}/mandate/sign`, {
         method: 'POST',
@@ -96,34 +121,6 @@ export function MandateSignatureForm({
       setError('Erreur de connexion au serveur')
     } finally {
       setIsUploading(false)
-    }
-  }
-
-  const handleElectronicSign = async () => {
-    setIsLoading(true)
-    setError('')
-
-    try {
-      const response = await fetch(`/api/dossiers/${dossierId}/mandate/sign`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ method: 'ELECTRONIC' }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        setError(data.error || 'Erreur lors de la signature électronique')
-        return
-      }
-
-      // In production, this would redirect to an e-signature provider
-      setSuccess('Votre mandat signé a bien été reçu.')
-      router.refresh()
-    } catch {
-      setError('Erreur de connexion au serveur')
-    } finally {
-      setIsLoading(false)
     }
   }
 
@@ -211,7 +208,7 @@ export function MandateSignatureForm({
           </div>
         </div>
 
-        {/* Signature Options */}
+        {/* Signature manuelle */}
         {statusDisplay.canEdit && (
           <>
             {error && (
@@ -226,166 +223,111 @@ export function MandateSignatureForm({
               </Alert>
             )}
 
-            {!signatureMode ? (
-              <div className="grid sm:grid-cols-2 gap-4">
-                {/* Option A: Manual Signature */}
-                <div
-                  className="p-6 border-2 border-dashed border-gray-200 rounded-lg hover:border-primary-300 hover:bg-primary-50 cursor-pointer transition-colors"
-                  onClick={() => setSignatureMode('manual')}
-                >
-                  <div className="flex flex-col items-center text-center gap-3">
-                    <div className="p-3 bg-gray-100 rounded-full">
-                      <Upload className="h-6 w-6 text-gray-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-gray-900">Signature manuscrite</h3>
-                      <p className="text-sm text-gray-500 mt-1">
-                        Téléchargez, imprimez, signez et renvoyez le mandat
-                      </p>
-                    </div>
+            <div className="space-y-4">
+              {/* Step 1: Download */}
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="flex items-center justify-center w-8 h-8 bg-primary-100 text-primary-600 rounded-full font-medium text-sm">
+                    1
                   </div>
+                  <h4 className="font-medium text-gray-900">Télécharger le mandat</h4>
                 </div>
-
-                {/* Option B: Electronic Signature */}
-                <div
-                  className="p-6 border-2 border-dashed border-gray-200 rounded-lg hover:border-primary-300 hover:bg-primary-50 cursor-pointer transition-colors"
-                  onClick={() => setSignatureMode('electronic')}
-                >
-                  <div className="flex flex-col items-center text-center gap-3">
-                    <div className="p-3 bg-primary-100 rounded-full">
-                      <PenTool className="h-6 w-6 text-primary-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-gray-900">Signature électronique</h3>
-                      <p className="text-sm text-gray-500 mt-1">
-                        Signez directement en ligne (plus rapide)
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                <p className="text-sm text-gray-600 mb-3">
+                  Téléchargez le mandat pré-rempli avec vos informations
+                </p>
+                <Button variant="outline" onClick={handleDownloadMandate}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Télécharger le mandat (PDF)
+                </Button>
               </div>
-            ) : signatureMode === 'manual' ? (
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 mb-4">
-                  <Button variant="ghost" size="sm" onClick={() => setSignatureMode(null)}>
-                    ← Retour
-                  </Button>
-                  <span className="text-sm text-gray-500">Signature manuscrite</span>
-                </div>
 
-                {/* Step 1: Download */}
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="flex items-center justify-center w-8 h-8 bg-primary-100 text-primary-600 rounded-full font-medium text-sm">
-                      1
-                    </div>
-                    <h4 className="font-medium text-gray-900">Télécharger le mandat</h4>
+              {/* Step 2: Sign */}
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="flex items-center justify-center w-8 h-8 bg-primary-100 text-primary-600 rounded-full font-medium text-sm">
+                    2
                   </div>
-                  <p className="text-sm text-gray-600 mb-3">
-                    Téléchargez le mandat pré-rempli avec vos informations
-                  </p>
-                  <Button variant="outline" onClick={handleDownloadMandate}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Télécharger le mandat (PDF)
-                  </Button>
+                  <h4 className="font-medium text-gray-900">Imprimer et signer</h4>
                 </div>
-
-                {/* Step 2: Sign */}
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="flex items-center justify-center w-8 h-8 bg-primary-100 text-primary-600 rounded-full font-medium text-sm">
-                      2
-                    </div>
-                    <h4 className="font-medium text-gray-900">Imprimer et signer</h4>
-                  </div>
-                  <p className="text-sm text-gray-600">
-                    Imprimez le document, signez-le manuellement, puis scannez-le ou prenez-le en photo
-                  </p>
-                </div>
-
-                {/* Step 3: Upload */}
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="flex items-center justify-center w-8 h-8 bg-primary-100 text-primary-600 rounded-full font-medium text-sm">
-                      3
-                    </div>
-                    <h4 className="font-medium text-gray-900">Envoyer le mandat signé</h4>
-                  </div>
-                  <div className="space-y-3">
-                    <input
-                      type="file"
-                      accept="application/pdf"
-                      onChange={handleFileChange}
-                      className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
-                    />
-                    {selectedFile && (
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <FileText className="h-4 w-4" />
-                        {selectedFile.name}
-                      </div>
-                    )}
-                    <Button
-                      onClick={handleManualUpload}
-                      disabled={!selectedFile || isUploading}
-                      className="w-full"
-                    >
-                      {isUploading ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Envoi en cours...
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="h-4 w-4 mr-2" />
-                          Envoyer mon mandat signé
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
+                <p className="text-sm text-gray-600">
+                  Imprimez le document, signez-le manuellement, puis scannez-le ou prenez-le en photo
+                </p>
               </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 mb-4">
-                  <Button variant="ghost" size="sm" onClick={() => setSignatureMode(null)}>
-                    ← Retour
-                  </Button>
-                  <span className="text-sm text-gray-500">Signature électronique</span>
-                </div>
 
-                <div className="p-6 bg-primary-50 border border-primary-100 rounded-lg text-center">
-                  <PenTool className="h-12 w-12 text-primary-500 mx-auto mb-4" />
-                  <h4 className="font-medium text-gray-900 mb-2">Signature électronique sécurisée</h4>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Vous allez être redirigé vers notre partenaire de signature électronique.
-                    La procédure prend moins de 2 minutes.
-                  </p>
-                  <Button onClick={handleElectronicSign} disabled={isLoading} size="lg">
-                    {isLoading ? (
+              {/* Step 3: Upload */}
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="flex items-center justify-center w-8 h-8 bg-primary-100 text-primary-600 rounded-full font-medium text-sm">
+                    3
+                  </div>
+                  <h4 className="font-medium text-gray-900">Envoyer le mandat signé</h4>
+                </div>
+                <div className="space-y-3">
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    onChange={handleFileChange}
+                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
+                  />
+                  {selectedFile && (
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <FileText className="h-4 w-4" />
+                      {selectedFile.name}
+                    </div>
+                  )}
+                  <Button
+                    onClick={handleManualUpload}
+                    disabled={!selectedFile || isUploading}
+                    className="w-full"
+                  >
+                    {isUploading ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Préparation...
+                        Envoi en cours...
                       </>
                     ) : (
                       <>
-                        <PenTool className="h-4 w-4 mr-2" />
-                        Signer électroniquement
+                        <Upload className="h-4 w-4 mr-2" />
+                        Envoyer mon mandat signé
                       </>
                     )}
                   </Button>
                 </div>
               </div>
-            )}
+            </div>
           </>
         )}
 
-        {/* Show method used if already submitted */}
-        {!statusDisplay.canEdit && mandatMethod && (
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <p className="text-sm text-gray-500">Méthode de signature</p>
-            <p className="font-medium text-gray-900">
-              {mandatMethod === 'ELECTRONIC' ? 'Signature électronique' : 'Signature manuscrite'}
-            </p>
+        {/* DEV: Skip button for testing */}
+        {process.env.NODE_ENV !== 'production' && statusDisplay.canEdit && (
+          <div className="pt-4 border-t border-dashed border-gray-200">
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <FastForward className="h-4 w-4 text-amber-600" />
+                <span className="text-sm font-medium text-amber-800">Mode développement</span>
+              </div>
+              <p className="text-sm text-amber-700 mb-3">
+                Passer cette étape sans compléter le mandat (uniquement en développement)
+              </p>
+              <Button
+                variant="outline"
+                onClick={handleSkipStep}
+                disabled={isSkipping}
+                className="w-full border-amber-300 text-amber-700 hover:bg-amber-100"
+              >
+                {isSkipping ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Passage en cours...
+                  </>
+                ) : (
+                  <>
+                    <FastForward className="h-4 w-4 mr-2" />
+                    Passer à l'étape suivante
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         )}
       </CardContent>

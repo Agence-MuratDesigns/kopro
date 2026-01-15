@@ -16,12 +16,15 @@ import {
   Droplets,
   Wind,
   Info,
+  Pencil,
+  X,
 } from 'lucide-react'
 
 interface WorkSelectionFormProps {
   dossierId: string
   selectedWorks: string[] | null
   isValidated: boolean
+  canModify: boolean // true si l'étape 5 (devis) n'est pas encore validée
 }
 
 const workIcons: Record<string, React.ReactNode> = {
@@ -35,17 +38,38 @@ export function WorkSelectionForm({
   dossierId,
   selectedWorks: initialSelectedWorks,
   isValidated,
+  canModify,
 }: WorkSelectionFormProps) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [selectedWorks, setSelectedWorks] = useState<string[]>(initialSelectedWorks || [])
+  const [isEditing, setIsEditing] = useState(false)
+
+  // Le formulaire est en mode édition si :
+  // - l'étape n'est pas encore validée (première soumission)
+  // - ou si l'utilisateur a cliqué sur "Modifier"
+  const isInEditMode = !isValidated || isEditing
 
   const toggleWork = (code: string) => {
+    if (!isInEditMode) return
+
     setSelectedWorks(prev =>
       prev.includes(code) ? prev.filter(w => w !== code) : [...prev, code]
     )
+    setError('')
+  }
+
+  const handleStartEdit = () => {
+    setIsEditing(true)
+    setSuccess('')
+    setError('')
+  }
+
+  const handleCancelEdit = () => {
+    setIsEditing(false)
+    setSelectedWorks(initialSelectedWorks || [])
     setError('')
   }
 
@@ -72,7 +96,8 @@ export function WorkSelectionForm({
         return
       }
 
-      setSuccess('Travaux sélectionnés avec succès ! Vous pouvez passer à l\'étape suivante.')
+      setSuccess(data.message || 'Travaux enregistrés avec succès !')
+      setIsEditing(false)
       router.refresh()
     } catch {
       setError('Erreur de connexion au serveur')
@@ -80,6 +105,9 @@ export function WorkSelectionForm({
       setIsLoading(false)
     }
   }
+
+  // Vérifier si la sélection a changé
+  const hasChanges = JSON.stringify(selectedWorks.sort()) !== JSON.stringify((initialSelectedWorks || []).sort())
 
   return (
     <Card>
@@ -94,7 +122,10 @@ export function WorkSelectionForm({
               </CardDescription>
             </div>
           </div>
-          {isValidated && <Badge variant="success">Validé</Badge>}
+          <div className="flex items-center gap-2">
+            {isValidated && !isEditing && <Badge variant="success">Validé</Badge>}
+            {isEditing && <Badge variant="warning">Modification en cours</Badge>}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -107,6 +138,11 @@ export function WorkSelectionForm({
                 Sélectionnez un ou plusieurs types de travaux. À l'étape suivante, vous devrez
                 déposer les devis correspondant à chaque type de travaux sélectionné.
               </p>
+              {isValidated && canModify && !isEditing && (
+                <p className="mt-2 font-medium">
+                  Vous pouvez encore modifier votre sélection tant que vos devis n'ont pas été validés.
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -127,17 +163,20 @@ export function WorkSelectionForm({
         <div className="grid sm:grid-cols-2 gap-4">
           {WORK_TYPES.map(work => {
             const isSelected = selectedWorks.includes(work.code)
+            const isClickable = isInEditMode
             return (
               <div
                 key={work.code}
-                onClick={() => !isValidated && toggleWork(work.code)}
+                onClick={() => isClickable && toggleWork(work.code)}
                 className={`
                   p-4 rounded-lg border-2 transition-all
-                  ${isValidated ? 'cursor-default' : 'cursor-pointer'}
+                  ${isClickable ? 'cursor-pointer' : 'cursor-default'}
                   ${
                     isSelected
                       ? 'border-primary-500 bg-primary-50'
-                      : 'border-gray-200 hover:border-gray-300'
+                      : isClickable
+                        ? 'border-gray-200 hover:border-gray-300'
+                        : 'border-gray-200'
                   }
                 `}
               >
@@ -186,26 +225,55 @@ export function WorkSelectionForm({
           </div>
         )}
 
-        {/* Submit Button */}
-        {!isValidated && (
-          <Button
-            onClick={handleSubmit}
-            disabled={selectedWorks.length === 0 || isLoading}
-            className="w-full sm:w-auto"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Enregistrement...
-              </>
-            ) : (
-              'Valider les travaux sélectionnés'
-            )}
-          </Button>
+        {/* Buttons */}
+        <div className="flex flex-wrap gap-3">
+          {/* Bouton Modifier - affiché si validé et modification possible */}
+          {isValidated && canModify && !isEditing && (
+            <Button variant="outline" onClick={handleStartEdit}>
+              <Pencil className="h-4 w-4 mr-2" />
+              Modifier la sélection
+            </Button>
+          )}
+
+          {/* Bouton Annuler - affiché en mode édition */}
+          {isEditing && (
+            <Button variant="outline" onClick={handleCancelEdit}>
+              <X className="h-4 w-4 mr-2" />
+              Annuler
+            </Button>
+          )}
+
+          {/* Bouton Valider - affiché si pas encore validé ou en mode édition */}
+          {isInEditMode && (
+            <Button
+              onClick={handleSubmit}
+              disabled={selectedWorks.length === 0 || isLoading || (isEditing && !hasChanges)}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Enregistrement...
+                </>
+              ) : isEditing ? (
+                'Enregistrer les modifications'
+              ) : (
+                'Valider les travaux sélectionnés'
+              )}
+            </Button>
+          )}
+        </div>
+
+        {/* Warning si modification avec devis existants */}
+        {isEditing && (
+          <Alert variant="warning" title="Attention">
+            Toute modification de votre sélection réinitialisera l'étape de dépôt des devis.
+            Vous devrez confirmer à nouveau avoir déposé tous les devis nécessaires.
+            Si vous retirez un type de travaux, les devis déjà déposés pour ce type seront supprimés.
+          </Alert>
         )}
 
         {/* Next step info */}
-        {isValidated && (
+        {isValidated && !isEditing && (
           <Alert variant="info" title="Prochaine étape">
             À l'étape suivante, vous devrez déposer les devis correspondant aux travaux sélectionnés.
           </Alert>

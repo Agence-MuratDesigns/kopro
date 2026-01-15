@@ -4,8 +4,9 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PhoneInput } from '@/components/ui/phone-input'
 import { Alert } from '@/components/ui/alert'
-import { Loader2, Save, Phone, MapPin, Home, Building2 } from 'lucide-react'
+import { Loader2, Save, Phone, MapPin } from 'lucide-react'
 
 interface ProfileFormProps {
   user: {
@@ -60,10 +61,14 @@ export function ProfileForm({ user }: ProfileFormProps) {
       return
     }
 
-    // Validate phone format (French)
-    if (formData.phone && !/^(?:(?:\+33|0033|0)[1-9](?:[0-9]{8}))$/.test(formData.phone.replace(/\s/g, ''))) {
-      setError('Le numéro de téléphone n\'est pas valide')
-      return
+    // Validate phone format (international)
+    if (formData.phone) {
+      const cleanPhone = formData.phone.replace(/\s/g, '')
+      // Accept international formats: +33 6 12 34 56 78, +32 4 12 34 56 78, etc.
+      if (!/^\+\d{1,4}\d{6,14}$/.test(cleanPhone)) {
+        setError('Le numéro de téléphone n\'est pas valide')
+        return
+      }
     }
 
     setIsLoading(true)
@@ -135,87 +140,90 @@ export function ProfileForm({ user }: ProfileFormProps) {
 
       {/* Phone */}
       <div>
-        <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
+        <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
           <Phone className="h-4 w-4 inline mr-1" />
           Téléphone
         </label>
-        <Input
+        <PhoneInput
           id="phone"
           name="phone"
-          type="tel"
           value={formData.phone}
-          onChange={handleChange}
-          placeholder="06 12 34 56 78"
+          onChange={(value) => {
+            setFormData(prev => ({ ...prev, phone: value }))
+            setError('')
+            setSuccess('')
+          }}
           disabled={isLoading}
-          className="max-w-xs"
+          className="max-w-md"
         />
-        <p className="text-xs text-gray-500 mt-1">Format français (ex: 06 12 34 56 78)</p>
       </div>
 
-      {/* Address */}
-      <div className="space-y-4">
-        <h4 className="font-medium text-gray-900 flex items-center gap-2">
-          <MapPin className="h-4 w-4" />
-          Adresse postale
-        </h4>
-
-        <div>
-          <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1">
-            <Home className="h-4 w-4 inline mr-1" />
-            Adresse
-          </label>
-          <Input
-            id="address"
-            name="address"
-            value={formData.address}
-            onChange={handleChange}
-            placeholder="123 rue de la Paix"
-            disabled={isLoading}
-          />
+      {/* Address Section */}
+      <div className="pt-6 border-t border-gray-200">
+        <div className="flex items-center gap-3 mb-5">
+          <div className="p-2 bg-accent-light rounded-lg">
+            <MapPin className="h-4 w-4 text-accent" />
+          </div>
+          <h4 className="font-semibold text-kopro-dark">Adresse postale</h4>
         </div>
 
-        <div>
-          <label htmlFor="addressComplement" className="block text-sm font-medium text-gray-700 mb-1">
-            Complément d'adresse
-          </label>
-          <Input
-            id="addressComplement"
-            name="addressComplement"
-            value={formData.addressComplement}
-            onChange={handleChange}
-            placeholder="Appartement, bâtiment, étage..."
-            disabled={isLoading}
-          />
-        </div>
-
-        <div className="grid sm:grid-cols-2 gap-4">
+        <div className="space-y-4 pl-11">
           <div>
-            <label htmlFor="postalCode" className="block text-sm font-medium text-gray-700 mb-1">
-              Code postal
+            <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1">
+              Adresse
             </label>
             <Input
-              id="postalCode"
-              name="postalCode"
-              value={formData.postalCode}
+              id="address"
+              name="address"
+              value={formData.address}
               onChange={handleChange}
-              placeholder="75001"
-              maxLength={5}
+              placeholder="123 rue de la Paix"
               disabled={isLoading}
             />
           </div>
+
           <div>
-            <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
-              <Building2 className="h-4 w-4 inline mr-1" />
-              Ville
+            <label htmlFor="addressComplement" className="block text-sm font-medium text-gray-700 mb-1">
+              Complément d'adresse
             </label>
             <Input
-              id="city"
-              name="city"
-              value={formData.city}
+              id="addressComplement"
+              name="addressComplement"
+              value={formData.addressComplement}
               onChange={handleChange}
-              placeholder="Paris"
+              placeholder="Appartement, bâtiment, étage..."
               disabled={isLoading}
             />
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="postalCode" className="block text-sm font-medium text-gray-700 mb-1">
+                Code postal
+              </label>
+              <Input
+                id="postalCode"
+                name="postalCode"
+                value={formData.postalCode}
+                onChange={handleChange}
+                placeholder="75001"
+                maxLength={5}
+                disabled={isLoading}
+              />
+            </div>
+            <div>
+              <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
+                Ville
+              </label>
+              <Input
+                id="city"
+                name="city"
+                value={formData.city}
+                onChange={handleChange}
+                placeholder="Paris"
+                disabled={isLoading}
+              />
+            </div>
           </div>
         </div>
       </div>

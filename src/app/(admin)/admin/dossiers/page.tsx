@@ -14,7 +14,7 @@ interface Props {
 
 export default async function AdminDossiersPage({ searchParams }: Props) {
   const params = await searchParams
-  await requireRole(['ADMIN', 'ADVISOR'])
+  await requireRole(['ADMIN'])
 
   const where: any = {}
 
