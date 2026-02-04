@@ -8,7 +8,7 @@
     "dev:clean": "rm -rf .next && next dev",
     "build": "prisma generate && next build",
     "postinstall": "prisma generate",
-    "start": "next start",
+    "start": "next start -p ${PORT:-3000}",
     "lint": "next lint",
     "clean": "rm -rf .next node_modules/.cache",
     "db:generate": "prisma generate",
