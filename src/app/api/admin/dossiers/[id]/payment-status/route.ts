@@ -47,7 +47,8 @@ export async function PATCH(request: NextRequest, context: Context) {
     })
 
     // Create notification for client if payment status changed
-    if (paymentStatus && paymentStatus !== dossier.paymentStatus) {
+    const notifyUserId = dossier.clientId || dossier.artisanId
+    if (paymentStatus && paymentStatus !== dossier.paymentStatus && notifyUserId) {
       let notificationMessage = ''
       switch (paymentStatus) {
         case 'IN_PROGRESS':
@@ -61,7 +62,7 @@ export async function PATCH(request: NextRequest, context: Context) {
       if (notificationMessage) {
         await prisma.notification.create({
           data: {
-            userId: dossier.clientId,
+            userId: notifyUserId,
             dossierId: id,
             type: 'DOCUMENT_VALIDATED',
             title: 'Mise à jour du versement',

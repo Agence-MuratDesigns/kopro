@@ -29,24 +29,81 @@ export async function POST(request: NextRequest, context: Context) {
       return NextResponse.json({ error: 'Document non trouvé' }, { status: 404 })
     }
 
-    await prisma.document.update({
-      where: { id: docId },
-      data: {
-        status: 'REJECTED',
-        rejectionReason: body.reason,
-      },
-    })
+    await prisma.$transaction(async (tx) => {
+      // Update document status
+      await tx.document.update({
+        where: { id: docId },
+        data: {
+          status: 'REJECTED',
+          rejectionReason: body.reason,
+        },
+      })
 
-    // Notify client
-    await prisma.notification.create({
-      data: {
-        userId: document.dossier.clientId,
-        dossierId: id,
-        type: 'DOCUMENT_REJECTED',
-        title: 'Document refusé',
-        message: `Votre document "${document.name}" a été refusé : ${body.reason}`,
-        link: `/dossier/${id}`,
-      },
+      // If it's a DEVIS or FACTURE, also update the dossier status
+      if (document.type === 'DEVIS') {
+        await tx.dossier.update({
+          where: { id },
+          data: {
+            quotesStatus: 'REJECTED',
+            quotesReviewMessage: body.reason,
+          },
+        })
+        // Update step status to allow re-submission
+        const quoteStep = await tx.dossierStep.findFirst({
+          where: {
+            dossierId: id,
+            template: { code: 'QUOTE_DEPOSIT' },
+          },
+        })
+        if (quoteStep) {
+          await tx.dossierStep.update({
+            where: { id: quoteStep.id },
+            data: {
+              status: 'AVAILABLE',
+              blockedReason: body.reason,
+            },
+          })
+        }
+      } else if (document.type === 'FACTURE') {
+        await tx.dossier.update({
+          where: { id },
+          data: {
+            invoicesStatus: 'REJECTED',
+            invoicesReviewMessage: body.reason,
+          },
+        })
+        // Update step status to allow re-submission
+        const invoiceStep = await tx.dossierStep.findFirst({
+          where: {
+            dossierId: id,
+            template: { code: 'INVOICE_DEPOSIT' },
+          },
+        })
+        if (invoiceStep) {
+          await tx.dossierStep.update({
+            where: { id: invoiceStep.id },
+            data: {
+              status: 'AVAILABLE',
+              blockedReason: body.reason,
+            },
+          })
+        }
+      }
+
+      // Notify client or artisan
+      const notifyUserId = document.dossier.clientId || document.dossier.artisanId
+      if (notifyUserId) {
+        await tx.notification.create({
+          data: {
+            userId: notifyUserId,
+            dossierId: id,
+            type: 'DOCUMENT_REJECTED',
+            title: 'Document refusé',
+            message: `Le document "${document.name}" a été refusé : ${body.reason}`,
+            link: `/dossier/${id}`,
+          },
+        })
+      }
     })
 
     return NextResponse.json({ success: true })

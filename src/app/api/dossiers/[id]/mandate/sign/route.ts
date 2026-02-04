@@ -30,7 +30,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Dossier non trouvé' }, { status: 404 })
     }
 
-    if (dossier.clientId !== user.id) {
+    // Check access: client owns the dossier OR artisan manages it
+    const isOwner = dossier.clientId === user.id
+    const isArtisanManager = user.role === 'ARTISAN' && dossier.artisanId === user.id
+    if (!isOwner && !isArtisanManager) {
       return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 })
     }
 
@@ -100,10 +103,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const buffer = Buffer.from(bytes)
     await writeFile(filePath, buffer)
 
+    // Get client name with fallback
+    const clientName = dossier.client
+      ? `${dossier.client.firstName} ${dossier.client.lastName}`
+      : dossier.endClientFirstName
+        ? `${dossier.endClientFirstName} ${dossier.endClientLastName || ''}`
+        : 'Client'
+
     // Create document record
     await prisma.document.create({
       data: {
-        name: `Mandat signé - ${dossier.client.firstName} ${dossier.client.lastName}`,
+        name: `Mandat signé - ${clientName}`,
         type: 'MANDAT',
         fileName: fileName,
         filePath: filePath,
@@ -149,23 +159,25 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             dossierId,
             type: 'MANDATE_SUBMITTED',
             title: 'Mandat signé à vérifier',
-            message: `${dossier.client.firstName} ${dossier.client.lastName} a déposé son mandat signé.`,
+            message: `${clientName} a déposé son mandat signé.`,
             link: `/admin/dossiers/${dossierId}`,
           },
         })
       }
 
-      // Notify client
-      await tx.notification.create({
-        data: {
-          userId: dossier.clientId,
-          dossierId,
-          type: 'MANDATE_SUBMITTED',
-          title: 'Mandat reçu',
-          message: 'Votre mandat signé a bien été reçu. Il est en cours de vérification.',
-          link: `/dossier/${dossierId}`,
-        },
-      })
+      // Notify client (only if there's a clientId)
+      if (dossier.clientId) {
+        await tx.notification.create({
+          data: {
+            userId: dossier.clientId,
+            dossierId,
+            type: 'MANDATE_SUBMITTED',
+            title: 'Mandat reçu',
+            message: 'Votre mandat signé a bien été reçu. Il est en cours de vérification.',
+            link: `/dossier/${dossierId}`,
+          },
+        })
+      }
 
       // Log activity
       await tx.activityLog.create({
@@ -181,7 +193,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // Notify admins in real-time
     notifyAdminsOfClientAction('mandate_submitted', {
       dossierId,
-      clientName: `${dossier.client.firstName} ${dossier.client.lastName}`,
+      clientName,
       message: 'Nouveau mandat signé à vérifier',
     })
 

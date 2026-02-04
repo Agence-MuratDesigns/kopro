@@ -1,139 +1,125 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ProjectInfoForm } from './project-info-form'
-import { Home, Pencil } from 'lucide-react'
-import { formatCurrency } from '@/lib/utils'
+import { Home, ArrowRight } from 'lucide-react'
+import { HOUSING_TYPES, REVENUE_CATEGORIES } from '@/lib/utils'
 
 interface ProjectInfoCardProps {
   dossierId: string
-  projectType: string | null
-  projectAddress: string | null
-  projectCity: string | null
-  projectPostalCode: string | null
-  estimatedBudget: number | null
+  projectInfoStatus: string
+  mprStatus: string // Status de l'étape 2 (identifiant MPR)
+  // Données provenant de l'étape 3
+  housingType: string | null
   revenueCategory: string | null
   householdSize: number | null
+  housingSurface: number | null
+  constructionYear: number | null
 }
 
 export function ProjectInfoCard({
   dossierId,
-  projectType,
-  projectAddress,
-  projectCity,
-  projectPostalCode,
-  estimatedBudget,
+  projectInfoStatus,
+  mprStatus,
+  housingType,
   revenueCategory,
   householdSize,
+  housingSurface,
+  constructionYear,
 }: ProjectInfoCardProps) {
-  const [showForm, setShowForm] = useState(false)
-  const router = useRouter()
+  // Vérifier si des données sont présentes
+  const hasAnyInfo = housingType || revenueCategory || householdSize || housingSurface || constructionYear
 
-  const hasAnyInfo = projectType || projectAddress || estimatedBudget || revenueCategory || householdSize
+  // L'étape 3 n'est accessible que si l'étape 2 (MPR) est validée
+  const canAccessStep3 = mprStatus === 'APPROVED'
 
-  const handleSuccess = () => {
-    setShowForm(false)
-    router.refresh()
-  }
+  // Obtenir les labels
+  const housingTypeLabel = HOUSING_TYPES.find(t => t.code === housingType)?.label
+  const revenueCategoryLabel = REVENUE_CATEGORIES.find(c => c.code === revenueCategory)?.label
 
   return (
-    <>
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col gap-2">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Home className="h-4 w-4" />
-              Informations du projet
-            </CardTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowForm(true)}
-              className="text-primary-600 hover:text-primary-700 hover:bg-primary-50 w-fit"
-            >
-              <Pencil className="h-4 w-4 mr-1" />
-              {hasAnyInfo ? 'Modifier' : 'Ajouter'}
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {!hasAnyInfo ? (
-            <div className="text-center py-4">
-              <p className="text-gray-500 text-sm mb-3">
-                Aucune information renseignée
-              </p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowForm(true)}
-              >
-                Ajouter les informations
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Home className="h-4 w-4" />
+          Informations du projet
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {!hasAnyInfo ? (
+          <div className="text-center py-4">
+            <p className="text-gray-500 text-sm mb-3">
+              Aucune information renseignée
+            </p>
+            {canAccessStep3 ? (
+              <Link href={`/dossier/${dossierId}/etape/PROJECT_INFO`}>
+                <Button variant="outline" size="sm">
+                  <ArrowRight className="h-4 w-4 mr-1" />
+                  Compléter à l'étape 3
+                </Button>
+              </Link>
+            ) : (
+              <Button variant="outline" size="sm" disabled className="opacity-50 cursor-not-allowed">
+                <ArrowRight className="h-4 w-4 mr-1" />
+                Compléter à l'étape 3
               </Button>
-            </div>
-          ) : (
-            <>
-              {projectType && (
-                <div>
-                  <p className="text-sm text-gray-500">Type de projet</p>
-                  <p className="font-medium">{projectType}</p>
-                </div>
-              )}
-              {projectAddress && (
-                <div>
-                  <p className="text-sm text-gray-500">Adresse</p>
-                  <p className="font-medium">
-                    {projectAddress}
-                    {(projectPostalCode || projectCity) && (
-                      <>
-                        <br />
-                        {projectPostalCode} {projectCity}
-                      </>
-                    )}
-                  </p>
-                </div>
-              )}
-              {estimatedBudget && (
-                <div>
-                  <p className="text-sm text-gray-500">Budget estimé</p>
-                  <p className="font-medium">{formatCurrency(estimatedBudget)}</p>
-                </div>
-              )}
-              {revenueCategory && (
-                <div>
-                  <p className="text-sm text-gray-500">Catégorie de revenus</p>
-                  <p className="font-medium">{revenueCategory}</p>
-                </div>
-              )}
-              {householdSize && (
-                <div>
-                  <p className="text-sm text-gray-500">Composition du foyer</p>
-                  <p className="font-medium">{householdSize} personne(s)</p>
-                </div>
-              )}
-            </>
-          )}
-        </CardContent>
-      </Card>
+            )}
+            {!canAccessStep3 && (
+              <p className="text-xs text-gray-400 mt-2">
+                Validez d'abord l'identifiant MaPrimeRénov'
+              </p>
+            )}
+          </div>
+        ) : (
+          <>
+            {housingTypeLabel && (
+              <div>
+                <p className="text-sm text-gray-500">Type de logement</p>
+                <p className="font-medium">{housingTypeLabel}</p>
+              </div>
+            )}
+            {housingSurface && (
+              <div>
+                <p className="text-sm text-gray-500">Surface</p>
+                <p className="font-medium">{housingSurface} m²</p>
+              </div>
+            )}
+            {constructionYear && (
+              <div>
+                <p className="text-sm text-gray-500">Année de construction</p>
+                <p className="font-medium">{constructionYear}</p>
+              </div>
+            )}
+            {revenueCategoryLabel && (
+              <div>
+                <p className="text-sm text-gray-500">Catégorie de revenus</p>
+                <p className="font-medium">{revenueCategoryLabel}</p>
+              </div>
+            )}
+            {householdSize && (
+              <div>
+                <p className="text-sm text-gray-500">Composition du foyer</p>
+                <p className="font-medium">{householdSize} personne(s)</p>
+              </div>
+            )}
 
-      {showForm && (
-        <ProjectInfoForm
-          dossierId={dossierId}
-          initialData={{
-            projectType,
-            projectAddress,
-            projectCity,
-            projectPostalCode,
-            estimatedBudget,
-            revenueCategory,
-            householdSize,
-          }}
-          onClose={() => setShowForm(false)}
-          onSuccess={handleSuccess}
-        />
-      )}
-    </>
+            {/* Lien vers l'étape 3 si pas encore validé */}
+            {projectInfoStatus !== 'APPROVED' && (
+              <div className="pt-2 border-t">
+                <Link href={`/dossier/${dossierId}/etape/PROJECT_INFO`}>
+                  <Button variant="ghost" size="sm" className="text-primary-600 hover:text-primary-700 w-full justify-start">
+                    <ArrowRight className="h-4 w-4 mr-1" />
+                    {projectInfoStatus === 'PENDING_REVIEW'
+                      ? 'Voir le détail'
+                      : 'Modifier à l\'étape 3'}
+                  </Button>
+                </Link>
+              </div>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
   )
 }

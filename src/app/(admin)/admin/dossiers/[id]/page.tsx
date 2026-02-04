@@ -5,13 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
-import { Alert } from '@/components/ui/alert'
-import { formatDate, formatCurrency, stepStatusLabels, stepStatusColors, documentTypeLabels } from '@/lib/utils'
-import { AdminStepActions } from './admin-step-actions'
-import { AdminDocumentActions } from './admin-document-actions'
+import { formatDate, formatCurrency, stepStatusLabels, stepStatusColors, formatDossierStatus } from '@/lib/utils'
 import { AdminMprValidation } from './admin-mpr-validation'
-import { AdminQuotesValidation } from './admin-quotes-validation'
-import { AdminInvoicesValidation } from './admin-invoices-validation'
+import { AdminCurrentStepCard } from './admin-current-step-card'
+import { AdminDocumentsList } from './admin-documents-list'
 import { AdminFinalizationPanel } from '@/components/admin/admin-finalization-panel'
 import Link from 'next/link'
 import {
@@ -20,15 +17,15 @@ import {
   MessageSquare,
   Euro,
   Home,
-  Calendar,
   User,
   Phone,
   Mail,
   Check,
-  X,
-  Clock,
   Key,
-  Download,
+  Building2,
+  CreditCard,
+  CheckCircle,
+  Clock,
 } from 'lucide-react'
 
 interface Props {
@@ -45,8 +42,33 @@ export default async function AdminDossierPage({ params }: Props) {
   }
 
   const progress = calculateProgress(dossier.steps)
-  const pendingSteps = dossier.steps.filter(s => s.status === 'PENDING_VALIDATION')
   const pendingDocs = dossier.documents.filter(d => d.status === 'PENDING')
+
+  // Trouver l'étape actuelle (similaire au dashboard client)
+  const currentStep = dossier.steps.find(
+    s => s.status === 'IN_PROGRESS' || s.status === 'AVAILABLE' || s.status === 'PENDING_VALIDATION'
+  )
+
+  // Trouver le document mandat si on est à l'étape de signature
+  const mandatDocument = currentStep?.template.code === 'MANDATE_SIGNATURE'
+    ? dossier.documents.find(d => d.type === 'MANDAT' && d.status === 'PENDING')
+    : null
+
+  // Trouver les devis si on est à l'étape de dépôt des devis
+  const quotesDocuments = currentStep?.template.code === 'QUOTE_DEPOSIT'
+    ? dossier.documents.filter(d => d.type === 'DEVIS')
+    : []
+
+  // Trouver les factures si on est à l'étape de dépôt des factures
+  const invoicesDocuments = currentStep?.template.code === 'INVOICE_DEPOSIT'
+    ? dossier.documents.filter(d => d.type === 'FACTURE')
+    : []
+
+  // Trouver l'étape PROJECT_INFO pour les documents projet
+  const projectInfoStep = dossier.steps.find(s => s.template.code === 'PROJECT_INFO')
+  const projectDocuments = currentStep?.template.code === 'PROJECT_INFO' && projectInfoStep
+    ? dossier.documents.filter(d => d.stepId === projectInfoStep.id)
+    : []
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -65,7 +87,7 @@ export default async function AdminDossierPage({ params }: Props) {
                 Dossier {dossier.reference}
               </h1>
               <Badge variant={dossier.status === 'TERMINE' ? 'success' : 'info'}>
-                {dossier.status.replace('_', ' ')}
+                {formatDossierStatus(dossier.status)}
               </Badge>
             </div>
             <p className="text-gray-600 mt-1">
@@ -74,48 +96,89 @@ export default async function AdminDossierPage({ params }: Props) {
           </div>
         </div>
         <div className="flex gap-3">
-          <Link href={`/admin/messages?dossier=${dossier.id}`}>
-            <Button variant="outline">
-              <MessageSquare className="h-4 w-4 mr-2" />
-              Messages
-            </Button>
-          </Link>
+          {dossier.client ? (
+            <Link href={`/admin/messages?client=${dossier.client.id}&dossier=${dossier.id}`}>
+              <Button variant="outline">
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Envoyer un message à {dossier.client.firstName}
+              </Button>
+            </Link>
+          ) : dossier.artisan ? (
+            <Link href={`/admin/messages?client=${dossier.artisan.id}&dossier=${dossier.id}`}>
+              <Button variant="outline">
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Contacter l'artisan
+              </Button>
+            </Link>
+          ) : null}
         </div>
       </div>
 
-      {/* Alerts */}
-      {pendingSteps.length > 0 && (
-        <Alert variant="warning" title="Étapes en attente de validation">
-          {pendingSteps.length} étape(s) nécessite(nt) votre validation.
-        </Alert>
+      {/* Étape actuelle - Bloc interactif en haut */}
+      {currentStep && (
+        <AdminCurrentStepCard
+          dossierId={dossier.id}
+          stepId={currentStep.id}
+          stepOrder={currentStep.template.order}
+          stepName={currentStep.template.name}
+          stepCode={currentStep.template.code}
+          stepDescription={currentStep.template.description}
+          stepStatus={currentStep.status}
+          mandatDocument={mandatDocument ? {
+            id: mandatDocument.id,
+            name: mandatDocument.name,
+            filePath: mandatDocument.filePath,
+            type: mandatDocument.type,
+            fileSize: mandatDocument.fileSize,
+          } : null}
+          mandatStatus={dossier.mandatStatus}
+          mprId={dossier.mprId}
+          mprStatus={dossier.mprStatus}
+          projectInfoStatus={dossier.projectInfoStatus}
+          projectInfoData={{
+            energyType: dossier.energyType,
+            housingType: dossier.housingType,
+            housingSurface: dossier.housingSurface,
+            constructionYear: dossier.constructionYear,
+            revenueCategory: dossier.revenueCategory,
+            householdSize: dossier.householdSize,
+            ownershipStatus: dossier.ownershipStatus,
+          }}
+          projectDocuments={projectDocuments.map(d => ({
+            id: d.id,
+            name: d.name,
+            filePath: d.filePath,
+            type: d.type,
+            workType: d.workType,
+            status: d.status,
+            fileSize: d.fileSize,
+          }))}
+          quotesDocuments={quotesDocuments.map(d => ({
+            id: d.id,
+            name: d.name,
+            filePath: d.filePath,
+            type: d.type,
+            workType: d.workType,
+            status: d.status,
+            fileSize: d.fileSize,
+          }))}
+          quotesStatus={dossier.quotesStatus}
+          invoicesDocuments={invoicesDocuments.map(d => ({
+            id: d.id,
+            name: d.name,
+            filePath: d.filePath,
+            type: d.type,
+            workType: d.workType,
+            status: d.status,
+            fileSize: d.fileSize,
+          }))}
+          invoicesStatus={dossier.invoicesStatus}
+          paymentStatus={dossier.servicePaymentStatus}
+          paymentAmount={dossier.servicePaymentAmount}
+          paymentCompletedAt={dossier.servicePaymentCompletedAt}
+        />
       )}
 
-      {pendingDocs.length > 0 && (
-        <Alert variant="info" title="Documents à vérifier">
-          {pendingDocs.length} document(s) en attente de vérification.
-        </Alert>
-      )}
-
-      {/* MPR Alert */}
-      {dossier.mprStatus === 'PENDING_REVIEW' && (
-        <Alert variant="warning" title="Identifiant MaPrimeRénov' à valider">
-          Le client a soumis son identifiant MaPrimeRénov' : <strong>{dossier.mprId}</strong>
-        </Alert>
-      )}
-
-      {/* Quotes Alert */}
-      {dossier.quotesStatus === 'PENDING_REVIEW' && (
-        <Alert variant="warning" title="Devis à vérifier">
-          Le client a soumis ses devis. Vérifiez-les et validez ou rejetez-les.
-        </Alert>
-      )}
-
-      {/* Invoices Alert */}
-      {dossier.invoicesStatus === 'PENDING_REVIEW' && (
-        <Alert variant="warning" title="Factures à vérifier">
-          Le client a soumis ses factures finales. Vérifiez-les et validez ou rejetez-les.
-        </Alert>
-      )}
 
       {/* Progress */}
       <Card>
@@ -141,36 +204,125 @@ export default async function AdminDossierPage({ params }: Props) {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <User className="h-5 w-5" />
-                Client
+                {dossier.artisan ? 'Client final' : 'Client'}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center">
-                  <span className="text-lg font-semibold text-primary-600">
-                    {dossier.client.firstName[0]}{dossier.client.lastName[0]}
-                  </span>
-                </div>
-                <div>
-                  <p className="font-medium text-gray-900">
-                    {dossier.client.firstName} {dossier.client.lastName}
-                  </p>
-                </div>
-              </div>
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center gap-2 text-gray-600">
-                  <Mail className="h-4 w-4" />
-                  {dossier.client.email}
-                </div>
-                {dossier.client.phone && (
-                  <div className="flex items-center gap-2 text-gray-600">
-                    <Phone className="h-4 w-4" />
-                    {dossier.client.phone}
+              {dossier.client ? (
+                <>
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center">
+                      <span className="text-lg font-semibold text-primary-600">
+                        {dossier.client.firstName[0]}{dossier.client.lastName[0]}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900">
+                        {dossier.client.firstName} {dossier.client.lastName}
+                      </p>
+                    </div>
                   </div>
-                )}
-              </div>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center gap-2 text-gray-600">
+                      <Mail className="h-4 w-4" />
+                      {dossier.client.email}
+                    </div>
+                    {dossier.client.phone && (
+                      <div className="flex items-center gap-2 text-gray-600">
+                        <Phone className="h-4 w-4" />
+                        {dossier.client.phone}
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : dossier.endClientFirstName ? (
+                <>
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
+                      <span className="text-lg font-semibold text-gray-600">
+                        {dossier.endClientFirstName[0]}{dossier.endClientLastName?.[0] || ''}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900">
+                        {dossier.endClientFirstName} {dossier.endClientLastName}
+                      </p>
+                      <p className="text-xs text-gray-500">Sans compte plateforme</p>
+                    </div>
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    {dossier.endClientEmail && (
+                      <div className="flex items-center gap-2 text-gray-600">
+                        <Mail className="h-4 w-4" />
+                        {dossier.endClientEmail}
+                      </div>
+                    )}
+                    {dossier.endClientPhone && (
+                      <div className="flex items-center gap-2 text-gray-600">
+                        <Phone className="h-4 w-4" />
+                        {dossier.endClientPhone}
+                      </div>
+                    )}
+                    {dossier.endClientAddress && (
+                      <div className="flex items-start gap-2 text-gray-600">
+                        <Home className="h-4 w-4 mt-0.5" />
+                        <span>
+                          {dossier.endClientAddress}<br />
+                          {dossier.endClientPostalCode} {dossier.endClientCity}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <p className="text-gray-500 text-sm">Aucune information client</p>
+              )}
             </CardContent>
           </Card>
+
+          {/* Artisan Info (si dossier géré par artisan) */}
+          {dossier.artisan && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5" />
+                  Artisan gestionnaire
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-accent-light rounded-full flex items-center justify-center">
+                    <Building2 className="h-6 w-6 text-accent" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">
+                      {dossier.artisan.companyName}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {dossier.artisan.firstName} {dossier.artisan.lastName}
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <Mail className="h-4 w-4" />
+                    {dossier.artisan.email}
+                  </div>
+                  {dossier.artisan.phone && (
+                    <div className="flex items-center gap-2 text-gray-600">
+                      <Phone className="h-4 w-4" />
+                      {dossier.artisan.phone}
+                    </div>
+                  )}
+                </div>
+                <Link href={`/admin/artisans/${dossier.artisan.id}`}>
+                  <Button variant="outline" size="sm" className="w-full mt-2">
+                    Voir le profil artisan
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Project Info */}
           <Card>
@@ -237,6 +389,66 @@ export default async function AdminDossierPage({ params }: Props) {
               </div>
             </CardContent>
           </Card>
+
+          {/* Frais de service */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                Frais de service
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className={`p-3 rounded-lg ${
+                dossier.servicePaymentStatus === 'SUCCEEDED'
+                  ? 'bg-green-50 border border-green-200'
+                  : dossier.servicePaymentStatus === 'PENDING'
+                  ? 'bg-amber-50 border border-amber-200'
+                  : 'bg-gray-50 border border-gray-200'
+              }`}>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    {dossier.servicePaymentStatus === 'SUCCEEDED' ? (
+                      <CheckCircle className="h-5 w-5 text-green-600" />
+                    ) : dossier.servicePaymentStatus === 'PENDING' ? (
+                      <Clock className="h-5 w-5 text-amber-600" />
+                    ) : (
+                      <CreditCard className="h-5 w-5 text-gray-400" />
+                    )}
+                    <span className={`font-medium ${
+                      dossier.servicePaymentStatus === 'SUCCEEDED'
+                        ? 'text-green-700'
+                        : dossier.servicePaymentStatus === 'PENDING'
+                        ? 'text-amber-700'
+                        : 'text-gray-600'
+                    }`}>
+                      {dossier.servicePaymentStatus === 'SUCCEEDED'
+                        ? 'Payé'
+                        : dossier.servicePaymentStatus === 'PENDING'
+                        ? 'En attente'
+                        : 'Non payé'}
+                    </span>
+                  </div>
+                  <Badge variant={
+                    dossier.servicePaymentStatus === 'SUCCEEDED'
+                      ? 'success'
+                      : dossier.servicePaymentStatus === 'PENDING'
+                      ? 'warning'
+                      : 'secondary'
+                  }>
+                    {dossier.servicePaymentAmount
+                      ? formatCurrency(dossier.servicePaymentAmount / 100)
+                      : formatCurrency(290)}
+                  </Badge>
+                </div>
+                {dossier.servicePaymentCompletedAt && (
+                  <p className="text-xs text-green-600">
+                    Payé le {formatDate(dossier.servicePaymentCompletedAt)}
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Center - Steps */}
@@ -251,83 +463,14 @@ export default async function AdminDossierPage({ params }: Props) {
               ...h,
               createdAt: h.createdAt.toISOString(),
             })) || []}
-            clientName={`${dossier.client.firstName} ${dossier.client.lastName}`}
+            clientName={dossier.client
+              ? `${dossier.client.firstName} ${dossier.client.lastName}`
+              : dossier.endClientFirstName
+                ? `${dossier.endClientFirstName} ${dossier.endClientLastName || ''}`
+                : 'Client'
+            }
           />
 
-          {/* Quotes Validation */}
-          <AdminQuotesValidation
-            dossierId={dossier.id}
-            quotesStatus={dossier.quotesStatus}
-            quotesSubmittedAt={dossier.quotesSubmittedAt?.toISOString() || null}
-            quotesReviewMessage={dossier.quotesReviewMessage}
-            documents={dossier.documents
-              .filter(d => d.type === 'DEVIS')
-              .map(d => ({
-                id: d.id,
-                name: d.name,
-                workType: d.workType,
-                status: d.status,
-                filePath: d.filePath,
-                uploadedAt: d.uploadedAt.toISOString(),
-              }))}
-            selectedWorks={dossier.selectedWorks ? JSON.parse(dossier.selectedWorks as string) : []}
-            clientName={`${dossier.client.firstName} ${dossier.client.lastName}`}
-          />
-
-          {/* Invoices Validation */}
-          <AdminInvoicesValidation
-            dossierId={dossier.id}
-            invoicesStatus={dossier.invoicesStatus}
-            invoicesSubmittedAt={dossier.invoicesSubmittedAt?.toISOString() || null}
-            invoicesReviewMessage={dossier.invoicesReviewMessage}
-            documents={dossier.documents
-              .filter(d => d.type === 'FACTURE')
-              .map(d => ({
-                id: d.id,
-                name: d.name,
-                workType: d.workType,
-                status: d.status,
-                filePath: d.filePath,
-                uploadedAt: d.uploadedAt.toISOString(),
-              }))}
-            selectedWorks={dossier.selectedWorks ? JSON.parse(dossier.selectedWorks as string) : []}
-            clientName={`${dossier.client.firstName} ${dossier.client.lastName}`}
-          />
-
-          {/* Pending Validations */}
-          {pendingSteps.length > 0 && (
-            <Card className="border-yellow-200 bg-yellow-50">
-              <CardHeader>
-                <CardTitle className="text-yellow-800">
-                  Étapes à valider ({pendingSteps.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {pendingSteps.map(step => (
-                  <div
-                    key={step.id}
-                    className="p-4 bg-white rounded-lg border border-yellow-200"
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <p className="font-medium text-gray-900">
-                          {step.template.name}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          {step.template.description}
-                        </p>
-                      </div>
-                    </div>
-                    <AdminStepActions
-                      dossierId={dossier.id}
-                      stepId={step.id}
-                      stepName={step.template.name}
-                    />
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          )}
 
           {/* All Steps */}
           <Card>
@@ -381,67 +524,20 @@ export default async function AdminDossierPage({ params }: Props) {
             </CardContent>
           </Card>
 
-          {/* Documents */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span>Documents ({dossier.documents.length})</span>
-                {pendingDocs.length > 0 && (
-                  <Badge variant="warning">{pendingDocs.length} à vérifier</Badge>
-                )}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {dossier.documents.length === 0 ? (
-                <p className="text-sm text-gray-500 text-center py-4">
-                  Aucun document
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {dossier.documents.map(doc => (
-                    <div
-                      key={doc.id}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                    >
-                      <div className="flex items-center gap-3">
-                        <FileText className="h-5 w-5 text-gray-400" />
-                        <div>
-                          <p className="font-medium text-gray-900">{doc.name}</p>
-                          <p className="text-sm text-gray-500">
-                            {documentTypeLabels[doc.type]} - {formatDate(doc.uploadedAt)}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          variant={
-                            doc.status === 'VALIDATED'
-                              ? 'success'
-                              : doc.status === 'REJECTED'
-                              ? 'error'
-                              : 'warning'
-                          }
-                        >
-                          {doc.status === 'VALIDATED'
-                            ? 'Validé'
-                            : doc.status === 'REJECTED'
-                            ? 'Refusé'
-                            : 'En attente'}
-                        </Badge>
-                        {doc.status === 'PENDING' && (
-                          <AdminDocumentActions
-                            dossierId={dossier.id}
-                            documentId={doc.id}
-                            documentName={doc.name}
-                          />
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          {/* Documents - Organisés par catégorie */}
+          <AdminDocumentsList
+            documents={dossier.documents.map(doc => ({
+              id: doc.id,
+              name: doc.name,
+              type: doc.type,
+              status: doc.status,
+              filePath: doc.filePath,
+              uploadedAt: doc.uploadedAt.toISOString(),
+              workType: doc.workType,
+              fileSize: doc.fileSize,
+            }))}
+            pendingCount={pendingDocs.length}
+          />
 
           {/* Finalization Panel */}
           <AdminFinalizationPanel

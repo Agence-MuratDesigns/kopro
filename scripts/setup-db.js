@@ -238,7 +238,7 @@ const stepTemplates = [
   { code: 'MANDATE_SIGNATURE', name: 'Signature du mandat', description: 'Signez le mandat administratif pour nous autoriser à effectuer les démarches', order: 3, category: 'CLIENT_ACTION' },
   { code: 'WORK_SELECTION', name: 'Sélection des travaux', description: 'Sélectionnez les types de travaux que vous souhaitez réaliser', order: 4, category: 'CLIENT_ACTION', autoValidation: 1 },
   { code: 'QUOTE_DEPOSIT', name: 'Dépôt des devis', description: 'Déposez les devis correspondant aux travaux sélectionnés', order: 5, category: 'CLIENT_ACTION' },
-  { code: 'WORK_AUTHORIZATION', name: 'Autorisation des travaux', description: 'Confirmez le démarrage des travaux une fois les devis validés', order: 6, category: 'CLIENT_ACTION' },
+  { code: 'WORK_AUTHORIZATION', name: 'Démarrage des travaux', description: 'Déclarez le début de vos travaux une fois les devis validés', order: 6, category: 'CLIENT_ACTION' },
   { code: 'INVOICE_DEPOSIT', name: 'Dépôt des factures', description: 'Déposez les factures finales une fois les travaux terminés', order: 7, category: 'CLIENT_ACTION' },
   { code: 'FINAL_RECAP', name: 'Récapitulatif final', description: 'Consultez le récapitulatif de votre dossier et les informations de versement', order: 8, category: 'FINAL' },
 ];

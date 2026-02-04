@@ -48,7 +48,7 @@ export function FloatingChat({
   unreadCount = 0,
   soundEnabled = true,
 }: FloatingChatProps) {
-  const { isOpen, openChat, closeChat, toggleChat } = useChat()
+  const { isOpen, pendingDossierId, pendingMessage, openChat, closeChat, toggleChat, clearPending } = useChat()
   const [messages, setMessages] = useState<Message[]>(initialMessages)
   const [newMessage, setNewMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -58,6 +58,24 @@ export function FloatingChat({
   const [hasNewMessage, setHasNewMessage] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { playMessage, playClick } = useSoundNotifications(soundEnabled)
+
+  // Handle pending dossier and message from context (when "Contacter le support" is clicked)
+  useEffect(() => {
+    if (isOpen && pendingDossierId) {
+      // Check if the dossier exists in the list
+      const dossierExists = dossiers.some(d => d.id === pendingDossierId)
+      if (dossierExists) {
+        setSelectedDossierId(pendingDossierId)
+      }
+    }
+  }, [isOpen, pendingDossierId, dossiers])
+
+  useEffect(() => {
+    if (isOpen && pendingMessage) {
+      setNewMessage(pendingMessage)
+      clearPending()
+    }
+  }, [isOpen, pendingMessage, clearPending])
 
   // Scroll to bottom of messages
   const scrollToBottom = () => {
@@ -97,13 +115,23 @@ export function FloatingChat({
     scrollToBottom()
   }, [messages])
 
-  // Poll for new messages when open
+  // Track last message timestamp for polling using ref to avoid re-creating interval
+  const lastMessageTimeRef = useRef<string>('')
+
+  // Update ref when messages change (without triggering interval recreation)
+  useEffect(() => {
+    if (messages.length > 0) {
+      lastMessageTimeRef.current = messages[messages.length - 1]?.createdAt || ''
+    }
+  }, [messages])
+
+  // Poll for new messages when open - stable dependencies only
   useEffect(() => {
     if (!isOpen || !selectedDossierId) return
 
     const interval = setInterval(async () => {
       try {
-        const response = await fetch(`/api/messages?dossierId=${selectedDossierId}&since=${messages[messages.length - 1]?.createdAt || ''}`)
+        const response = await fetch(`/api/messages?dossierId=${selectedDossierId}&since=${lastMessageTimeRef.current}`)
         if (response.ok) {
           const data = await response.json()
           if (data.messages?.length > 0) {
@@ -111,13 +139,13 @@ export function FloatingChat({
             playMessage()
           }
         }
-      } catch (error) {
+      } catch {
         // Silent fail for polling
       }
     }, 5000)
 
     return () => clearInterval(interval)
-  }, [isOpen, selectedDossierId, messages, playMessage])
+  }, [isOpen, selectedDossierId, playMessage])
 
   // Handle new message notification when closed
   useEffect(() => {

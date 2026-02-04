@@ -51,10 +51,13 @@ const documentTypeLabels: Record<string, string> = {
 
 export default async function DocumentsPage() {
   const user = await requireAuth()
+  const isArtisan = user.role === 'ARTISAN'
 
   // Get all dossiers with their documents
   const dossiers = await prisma.dossier.findMany({
-    where: { clientId: user.id },
+    where: isArtisan
+      ? { artisanId: user.id }
+      : { clientId: user.id },
     include: {
       documents: {
         orderBy: { uploadedAt: 'desc' },

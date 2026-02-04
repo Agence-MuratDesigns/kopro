@@ -22,8 +22,15 @@ export async function DELETE(request: NextRequest, context: Context) {
       where: { id },
     })
 
-    if (!dossier || dossier.clientId !== session.userId) {
+    if (!dossier) {
       return NextResponse.json({ error: 'Dossier non trouvé' }, { status: 404 })
+    }
+
+    // Check access: client owns the dossier OR artisan manages it
+    const isOwner = dossier.clientId === session.userId
+    const isArtisanManager = dossier.artisanId === session.userId
+    if (!isOwner && !isArtisanManager) {
+      return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 })
     }
 
     // Check if invoices can be modified
@@ -100,8 +107,15 @@ export async function GET(request: NextRequest, context: Context) {
       where: { id },
     })
 
-    if (!dossier || dossier.clientId !== session.userId) {
+    if (!dossier) {
       return NextResponse.json({ error: 'Dossier non trouvé' }, { status: 404 })
+    }
+
+    // Check access: client owns the dossier OR artisan manages it
+    const isOwnerGet = dossier.clientId === session.userId
+    const isArtisanManagerGet = dossier.artisanId === session.userId
+    if (!isOwnerGet && !isArtisanManagerGet) {
+      return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 })
     }
 
     // Find the document

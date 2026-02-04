@@ -30,8 +30,15 @@ export async function POST(request: NextRequest, context: Context) {
       },
     })
 
-    if (!dossier || dossier.clientId !== session.userId) {
+    if (!dossier) {
       return NextResponse.json({ error: 'Dossier non trouvé' }, { status: 404 })
+    }
+
+    // Check access: client owns the dossier OR artisan manages it
+    const isOwner = dossier.clientId === session.userId
+    const isArtisanManager = dossier.artisanId === session.userId
+    if (!isOwner && !isArtisanManager) {
+      return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 })
     }
 
     // Check if already submitted and pending review
@@ -115,6 +122,12 @@ export async function POST(request: NextRequest, context: Context) {
         where: { role: { in: ['ADMIN'] } },
       })
 
+      const clientName = dossier.client
+        ? `${dossier.client.firstName} ${dossier.client.lastName}`
+        : dossier.endClientFirstName
+          ? `${dossier.endClientFirstName} ${dossier.endClientLastName || ''}`
+          : 'Client'
+
       for (const admin of admins) {
         await tx.notification.create({
           data: {
@@ -122,7 +135,7 @@ export async function POST(request: NextRequest, context: Context) {
             dossierId: id,
             type: 'DOCUMENT_REQUIRED',
             title: 'Factures finales déposées',
-            message: `${dossier.client.firstName} ${dossier.client.lastName} a déposé ses factures finales. Vérification requise.`,
+            message: `${clientName} a déposé ses factures finales. Vérification requise.`,
             link: `/admin/dossiers/${id}`,
           },
         })
@@ -150,10 +163,15 @@ export async function POST(request: NextRequest, context: Context) {
     })
 
     // Notify admins in real-time
+    const clientNameRealtime = dossier.client
+      ? `${dossier.client.firstName} ${dossier.client.lastName}`
+      : dossier.endClientFirstName
+        ? `${dossier.endClientFirstName} ${dossier.endClientLastName || ''}`
+        : 'Client'
     notifyAdminsOfClientAction('invoices_submitted', {
       dossierId: id,
-      clientName: `${dossier.client.firstName} ${dossier.client.lastName}`,
-      message: `Factures finales déposées par ${dossier.client.firstName} ${dossier.client.lastName}`,
+      clientName: clientNameRealtime,
+      message: `Factures finales déposées par ${clientNameRealtime}`,
     })
 
     return NextResponse.json({

@@ -72,17 +72,20 @@ export async function POST(request: NextRequest, context: Context) {
         })
       }
     } else {
-      // Notify client
-      await prisma.notification.create({
-        data: {
-          userId: dossier.clientId,
-          dossierId: id,
-          type: 'MESSAGE_RECEIVED',
-          title: 'Nouveau message de KOPRO',
-          message: 'Vous avez reçu un nouveau message de votre conseiller.',
-          link: `/messages?dossier=${id}`,
-        },
-      })
+      // Notify client (only if there's a clientId)
+      const notifyUserId = dossier.clientId || dossier.artisanId
+      if (notifyUserId) {
+        await prisma.notification.create({
+          data: {
+            userId: notifyUserId,
+            dossierId: id,
+            type: 'MESSAGE_RECEIVED',
+            title: 'Nouveau message de KOPRO',
+            message: 'Vous avez reçu un nouveau message de votre conseiller.',
+            link: `/messages?dossier=${id}`,
+          },
+        })
+      }
     }
 
     // Real-time notification
@@ -98,11 +101,14 @@ export async function POST(request: NextRequest, context: Context) {
         message: `Nouveau message sur le dossier ${dossier.reference}`,
       })
     } else {
-      // Notify client in real-time
-      sendEventToUser(dossier.clientId, 'message', {
-        dossierId: id,
-        message: 'Nouveau message de votre conseiller',
-      })
+      // Notify client in real-time (only if there's a user to notify)
+      const realtimeNotifyUserId = dossier.clientId || dossier.artisanId
+      if (realtimeNotifyUserId) {
+        sendEventToUser(realtimeNotifyUserId, 'message', {
+          dossierId: id,
+          message: 'Nouveau message de votre conseiller',
+        })
+      }
     }
 
     return NextResponse.json({ message })

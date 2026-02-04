@@ -78,7 +78,7 @@ export function WorkAuthorizationForm({
               <PlayCircle className="h-5 w-5 text-primary-500" />
             )}
             <div>
-              <CardTitle>Autorisation de démarrage des travaux</CardTitle>
+              <CardTitle>Déclarer le début des travaux</CardTitle>
               <CardDescription>
                 Vos devis ont été validés, vous pouvez démarrer les travaux
               </CardDescription>

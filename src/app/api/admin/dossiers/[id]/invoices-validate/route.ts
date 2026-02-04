@@ -39,9 +39,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Dossier non trouvé' }, { status: 404 })
     }
 
-    if (dossier.invoicesStatus !== 'PENDING_REVIEW') {
+    // Pour l'approbation, vérifier que les factures sont en attente
+    if (action === 'APPROVE' && dossier.invoicesStatus !== 'PENDING_REVIEW') {
       return NextResponse.json(
         { error: 'Les factures ne sont pas en attente de validation' },
+        { status: 400 }
+      )
+    }
+
+    // Pour le rejet, autoriser PENDING_REVIEW ou si déjà rejeté (re-rejet avec nouveau message)
+    if (action === 'REJECT' && !['PENDING_REVIEW', 'REJECTED'].includes(dossier.invoicesStatus || '')) {
+      return NextResponse.json(
+        { error: 'Les factures ne peuvent pas être rejetées dans cet état' },
         { status: 400 }
       )
     }
@@ -54,6 +63,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         { status: 400 }
       )
     }
+
+    const notifyUserId = dossier.clientId || dossier.artisanId
 
     if (action === 'APPROVE') {
       await prisma.$transaction(async (tx) => {
@@ -97,30 +108,34 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             data: { status: 'AVAILABLE' },
           })
 
-          // Notify client about next step
+          // Notify client about next step (only if there's a user to notify)
+          if (notifyUserId) {
+            await tx.notification.create({
+              data: {
+                userId: notifyUserId,
+                dossierId,
+                type: 'STEP_AVAILABLE',
+                title: 'Factures validées',
+                message: 'Vos factures ont été validées. Votre dossier est maintenant complet !',
+                link: `/dossier/${dossierId}/etape/${nextStep.template.code}`,
+              },
+            })
+          }
+        }
+
+        // Notify client (only if there's a user to notify)
+        if (notifyUserId) {
           await tx.notification.create({
             data: {
-              userId: dossier.clientId,
+              userId: notifyUserId,
               dossierId,
-              type: 'STEP_AVAILABLE',
+              type: 'STEP_VALIDATED',
               title: 'Factures validées',
-              message: 'Vos factures ont été validées. Votre dossier est maintenant complet !',
-              link: `/dossier/${dossierId}/etape/${nextStep.template.code}`,
+              message: 'Vos factures finales ont été vérifiées et validées. Votre dossier est complet !',
+              link: `/dossier/${dossierId}`,
             },
           })
         }
-
-        // Notify client
-        await tx.notification.create({
-          data: {
-            userId: dossier.clientId,
-            dossierId,
-            type: 'STEP_VALIDATED',
-            title: 'Factures validées',
-            message: 'Vos factures finales ont été vérifiées et validées. Votre dossier est complet !',
-            link: `/dossier/${dossierId}`,
-          },
-        })
 
         // Create system message
         await tx.message.create({
@@ -187,17 +202,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           },
         })
 
-        // Notify client
-        await tx.notification.create({
-          data: {
-            userId: dossier.clientId,
-            dossierId,
-            type: 'STEP_REJECTED',
-            title: 'Factures rejetées',
-            message: `Vos factures ont été rejetées : ${message}. Veuillez les corriger.`,
-            link: `/dossier/${dossierId}/etape/INVOICE_DEPOSIT`,
-          },
-        })
+        // Notify client (only if there's a user to notify)
+        if (notifyUserId) {
+          await tx.notification.create({
+            data: {
+              userId: notifyUserId,
+              dossierId,
+              type: 'STEP_REJECTED',
+              title: 'Factures rejetées',
+              message: `Vos factures ont été rejetées : ${message}. Veuillez les corriger.`,
+              link: `/dossier/${dossierId}/etape/INVOICE_DEPOSIT`,
+            },
+          })
+        }
 
         // Create system message
         await tx.message.create({

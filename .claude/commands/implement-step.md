@@ -8,7 +8,7 @@ Implement one of the 8 workflow steps for KOPRO. Refer to CLAUDE.md for specific
 - `MANDATE_SIGNATURE` - Étape 3: Signature du mandat
 - `WORK_SELECTION` - Étape 4: Sélection des travaux
 - `QUOTE_DEPOSIT` - Étape 5: Dépôt du devis
-- `WORK_AUTHORIZATION` - Étape 6: Autorisation début travaux
+- `WORK_AUTHORIZATION` - Étape 6: Démarrage des travaux
 - `INVOICE_DEPOSIT` - Étape 7: Dépôt de la facture
 - `FINAL_RECAP` - Étape 8: Récapitulatif et clôture
 

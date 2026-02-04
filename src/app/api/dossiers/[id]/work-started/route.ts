@@ -17,7 +17,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const dossier = await prisma.dossier.findUnique({
       where: { id: dossierId },
       include: {
-        client: true,
+        client: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
         steps: {
           include: { template: true },
           orderBy: { template: { order: 'asc' } },
@@ -29,9 +35,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Dossier non trouvé' }, { status: 404 })
     }
 
-    if (dossier.clientId !== user.id) {
+    // Check ownership (client or artisan)
+    const isOwner = dossier.clientId === user.id || dossier.artisanId === user.id
+    if (!isOwner) {
       return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 })
     }
+
+    // Determine if this is an artisan-managed dossier
+    const isArtisanManaged = dossier.artisanId === user.id
 
     // Check if work has already started
     if (dossier.workStatus !== 'NOT_STARTED') {
@@ -49,11 +60,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       )
     }
 
-    // Find the work authorization step (step 6)
+    // Find the work start step (step 6)
     const workAuthStep = dossier.steps.find(s => s.template.code === 'WORK_AUTHORIZATION')
     if (!workAuthStep) {
       return NextResponse.json(
-        { error: 'Étape d\'autorisation des travaux non trouvée' },
+        { error: 'Étape de démarrage des travaux non trouvée' },
         { status: 400 }
       )
     }
@@ -87,7 +98,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         },
       })
 
-      // Update step 6 as validated (auto-validation when client notifies)
+      // Update step 6 as validated (auto-validation when client declares start)
       await tx.dossierStep.update({
         where: { id: workAuthStep.id },
         data: {
@@ -113,6 +124,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         where: { role: { in: ['ADMIN'] } },
       })
 
+      // Get client name for notifications
+      const clientName = isArtisanManaged
+        ? `${dossier.endClientFirstName} ${dossier.endClientLastName}`
+        : `${dossier.client?.firstName} ${dossier.client?.lastName}`
+
       for (const admin of admins) {
         await tx.notification.create({
           data: {
@@ -120,20 +136,22 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             dossierId,
             type: 'WORK_STARTED',
             title: 'Travaux démarrés',
-            message: `Le client ${user.firstName} ${user.lastName} a notifié le début des travaux`,
+            message: isArtisanManaged
+              ? `L'artisan ${user.firstName} ${user.lastName} a notifié le début des travaux pour ${clientName}`
+              : `Le client ${clientName} a notifié le début des travaux`,
             link: `/admin/dossiers/${dossierId}`,
           },
         })
       }
 
-      // Create notification for client
+      // Create notification for the user (client or artisan)
       await tx.notification.create({
         data: {
           userId: user.id,
           dossierId,
           type: 'WORK_STARTED_CONFIRMATION',
           title: 'Début des travaux confirmé',
-          message: 'Le début des travaux a bien été enregistré. N\'oubliez pas de conserver toutes vos factures.',
+          message: 'Le début des travaux a bien été enregistré. N\'oubliez pas de conserver toutes les factures.',
           link: `/dossier/${dossierId}`,
         },
       })
@@ -154,16 +172,25 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           userId: user.id,
           dossierId,
           action: 'WORK_STARTED',
-          details: 'Le client a notifié le début des travaux',
+          details: isArtisanManaged
+            ? `L'artisan a notifié le début des travaux pour ${clientName}`
+            : 'Le client a notifié le début des travaux',
         },
       })
     })
 
+    // Get client name for real-time notification
+    const clientNameForNotification = isArtisanManaged
+      ? `${dossier.endClientFirstName} ${dossier.endClientLastName}`
+      : `${dossier.client?.firstName} ${dossier.client?.lastName}`
+
     // Notify admins in real-time
     notifyAdminsOfClientAction('work_started', {
       dossierId,
-      clientName: `${user.firstName} ${user.lastName}`,
-      message: `${user.firstName} ${user.lastName} a démarré ses travaux`,
+      clientName: clientNameForNotification,
+      message: isArtisanManaged
+        ? `L'artisan ${user.firstName} ${user.lastName} a notifié le début des travaux pour ${clientNameForNotification}`
+        : `${clientNameForNotification} a démarré ses travaux`,
     })
 
     return NextResponse.json({
@@ -189,6 +216,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       where: { id: dossierId },
       select: {
         clientId: true,
+        artisanId: true,
         workStatus: true,
         workStartedAt: true,
         quotesStatus: true,
@@ -199,7 +227,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Dossier non trouvé' }, { status: 404 })
     }
 
-    if (dossier.clientId !== user.id) {
+    // Check ownership (client or artisan)
+    const isOwner = dossier.clientId === user.id || dossier.artisanId === user.id
+    if (!isOwner) {
       return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 })
     }
 

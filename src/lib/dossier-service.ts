@@ -23,6 +23,9 @@ export async function createDossier(clientId: string, data: {
     data: {
       reference,
       clientId,
+      status: 'EN_COURS',
+      currentStep: 2,
+      mprStatus: 'DRAFT',
       ...data,
     },
   })
@@ -33,13 +36,24 @@ export async function createDossier(clientId: string, data: {
   })
 
   // Create all steps for this dossier
+  // Step 1 (CLIENT_CREATION) is auto-validated since client already has an account
+  // Step 2 (MPR_IDENTIFIER) is set to AVAILABLE for client to start
+  // All other steps are LOCKED
   for (let i = 0; i < templates.length; i++) {
+    let status = 'LOCKED'
+    if (i === 0) {
+      status = 'VALIDATED' // Step 1 auto-validated (client has account)
+    } else if (i === 1) {
+      status = 'AVAILABLE' // Step 2 available for client input
+    }
+
     await prisma.dossierStep.create({
       data: {
         dossierId: dossier.id,
         templateId: templates[i].id,
-        status: i === 0 ? 'AVAILABLE' : 'LOCKED',
-        startedAt: i === 0 ? new Date() : null,
+        status,
+        validatedAt: i === 0 ? new Date() : null,
+        startedAt: i === 1 ? new Date() : null,
       },
     })
   }
@@ -51,8 +65,18 @@ export async function createDossier(clientId: string, data: {
       dossierId: dossier.id,
       type: 'STEP_AVAILABLE',
       title: 'Dossier créé',
-      message: `Votre dossier ${reference} a été créé. Vous pouvez commencer la première étape.`,
+      message: `Votre dossier ${reference} a été créé. Vous pouvez commencer en renseignant votre identifiant MaPrimeRénov'.`,
       link: `/dossier/${dossier.id}`,
+    },
+  })
+
+  // Log activity
+  await prisma.activityLog.create({
+    data: {
+      userId: clientId,
+      dossierId: dossier.id,
+      action: 'DOSSIER_CREATED',
+      details: `Nouveau dossier créé : ${reference}`,
     },
   })
 
@@ -72,6 +96,18 @@ export async function getDossierWithSteps(dossierId: string) {
           phone: true,
           role: true,
           firstLoginAt: true,
+        },
+      },
+      artisan: {
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+          role: true,
+          companyName: true,
+          siret: true,
         },
       },
       advisor: {
@@ -251,23 +287,27 @@ export async function validateStep(
   const currentIndex = allSteps.findIndex(s => s.id === stepId)
   const nextStep = allSteps[currentIndex + 1]
 
+  const notifyUserId = step.dossier.clientId || step.dossier.artisanId
+
   if (nextStep) {
     await prisma.dossierStep.update({
       where: { id: nextStep.id },
       data: { status: 'AVAILABLE' },
     })
 
-    // Notify client
-    await prisma.notification.create({
-      data: {
-        userId: step.dossier.clientId,
-        dossierId,
-        type: 'STEP_AVAILABLE',
-        title: 'Nouvelle étape disponible',
-        message: `L'étape "${nextStep.template.name}" est maintenant disponible.`,
-        link: `/dossier/${dossierId}/etape/${nextStep.template.code}`,
-      },
-    })
+    // Notify client or artisan
+    if (notifyUserId) {
+      await prisma.notification.create({
+        data: {
+          userId: notifyUserId,
+          dossierId,
+          type: 'STEP_AVAILABLE',
+          title: 'Nouvelle étape disponible',
+          message: `L'étape "${nextStep.template.name}" est maintenant disponible.`,
+          link: `/dossier/${dossierId}/etape/${nextStep.template.code}`,
+        },
+      })
+    }
   } else {
     // All steps completed
     await prisma.dossier.update({
@@ -275,29 +315,33 @@ export async function validateStep(
       data: { status: 'TERMINE' },
     })
 
+    if (notifyUserId) {
+      await prisma.notification.create({
+        data: {
+          userId: notifyUserId,
+          dossierId,
+          type: 'DOSSIER_UPDATE',
+          title: 'Dossier terminé',
+          message: 'Félicitations ! Le dossier est maintenant complet.',
+          link: `/dossier/${dossierId}`,
+        },
+      })
+    }
+  }
+
+  // Notify client or artisan of validation
+  if (notifyUserId) {
     await prisma.notification.create({
       data: {
-        userId: step.dossier.clientId,
+        userId: notifyUserId,
         dossierId,
-        type: 'DOSSIER_UPDATE',
-        title: 'Dossier terminé',
-        message: 'Félicitations ! Votre dossier est maintenant complet.',
+        type: 'STEP_VALIDATED',
+        title: 'Étape validée',
+        message: `L'étape "${step.template.name}" a été validée.`,
         link: `/dossier/${dossierId}`,
       },
     })
   }
-
-  // Notify client of validation
-  await prisma.notification.create({
-    data: {
-      userId: step.dossier.clientId,
-      dossierId,
-      type: 'STEP_VALIDATED',
-      title: 'Étape validée',
-      message: `L'étape "${step.template.name}" a été validée.`,
-      link: `/dossier/${dossierId}`,
-    },
-  })
 
   return { success: true, nextStep: nextStep?.template.code }
 }
@@ -329,17 +373,20 @@ export async function blockStep(
     data: { status: 'EN_ATTENTE' },
   })
 
-  // Notify client
-  await prisma.notification.create({
-    data: {
-      userId: step.dossier.clientId,
-      dossierId,
-      type: 'STEP_BLOCKED',
-      title: 'Étape bloquée',
-      message: `L'étape "${step.template.name}" nécessite votre attention : ${reason}`,
-      link: `/dossier/${dossierId}/etape/${step.template.code}`,
-    },
-  })
+  // Notify client or artisan
+  const notifyUserId = step.dossier.clientId || step.dossier.artisanId
+  if (notifyUserId) {
+    await prisma.notification.create({
+      data: {
+        userId: notifyUserId,
+        dossierId,
+        type: 'STEP_BLOCKED',
+        title: 'Étape bloquée',
+        message: `L'étape "${step.template.name}" nécessite votre attention : ${reason}`,
+        link: `/dossier/${dossierId}/etape/${step.template.code}`,
+      },
+    })
+  }
 
   return { success: true }
 }

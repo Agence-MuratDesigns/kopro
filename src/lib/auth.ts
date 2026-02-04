@@ -11,7 +11,7 @@ const JWT_SECRET = new TextEncoder().encode(
 export interface JWTPayload {
   userId: string
   email: string
-  role: 'CLIENT' | 'ADMIN'
+  role: 'CLIENT' | 'ADMIN' | 'ARTISAN'
   exp?: number
 }
 
@@ -112,7 +112,7 @@ export async function requireAuth() {
   return user
 }
 
-export async function requireRole(roles: ('CLIENT' | 'ADMIN')[]) {
+export async function requireRole(roles: ('CLIENT' | 'ADMIN' | 'ARTISAN')[]) {
   const user = await requireAuth()
   if (!roles.includes(user.role as any)) {
     redirect('/unauthorized')

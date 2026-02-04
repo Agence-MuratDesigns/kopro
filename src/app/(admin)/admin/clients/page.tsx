@@ -97,11 +97,9 @@ export default async function ClientsPage() {
       ) : (
         <div className="grid gap-4">
           {clients.map(client => {
-            const dossier = client.dossiers[0]
-            const progress = dossier ? getProgress(dossier.steps) : 0
-            const currentStep = dossier?.steps.find(
-              s => s.status === 'IN_PROGRESS' || s.status === 'AVAILABLE' || s.status === 'PENDING_VALIDATION'
-            )
+            const dossiersCount = client.dossiers.length
+            const mainDossier = client.dossiers[0]
+            const mainProgress = mainDossier ? getProgress(mainDossier.steps) : 0
 
             return (
               <Card key={client.id} className="hover:shadow-md transition-shadow">
@@ -153,36 +151,43 @@ export default async function ClientsPage() {
                       </div>
                     </div>
 
-                    {/* Dossier Info */}
-                    {dossier ? (
+                    {/* Dossiers Info */}
+                    {dossiersCount > 0 ? (
                       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 lg:gap-6">
-                        <div className="text-sm">
+                        {/* Dossiers count */}
+                        <div className="text-center">
                           <div className="flex items-center gap-2 mb-1">
                             <FileText className="h-4 w-4 text-gray-400" />
-                            <span className="font-medium text-gray-900">{dossier.reference}</span>
+                            <span className="text-2xl font-bold text-primary-600">{dossiersCount}</span>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-gray-500">MPR:</span>
-                            {getMprStatusBadge(dossier.mprStatus)}
-                          </div>
+                          <div className="text-xs text-gray-500">dossier{dossiersCount > 1 ? 's' : ''}</div>
                         </div>
 
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-primary-600">{progress}%</div>
-                          <div className="text-xs text-gray-500">Progression</div>
-                        </div>
+                        {/* Main dossier info */}
+                        {mainDossier && (
+                          <>
+                            <div className="text-sm">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-gray-500">Dernier:</span>
+                                <span className="font-medium text-gray-900">{mainDossier.reference}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-gray-500">MPR:</span>
+                                {getMprStatusBadge(mainDossier.mprStatus)}
+                              </div>
+                            </div>
 
-                        {currentStep && (
-                          <div className="text-sm text-right">
-                            <p className="text-gray-500">Étape en cours</p>
-                            <p className="font-medium text-gray-900">{currentStep.template.name}</p>
-                          </div>
+                            <div className="text-center">
+                              <div className="text-lg font-bold text-primary-600">{mainProgress}%</div>
+                              <div className="text-xs text-gray-500">Progression</div>
+                            </div>
+                          </>
                         )}
 
-                        <Link href={`/admin/dossiers/${dossier.id}`}>
+                        <Link href={`/admin/dossiers?client=${client.id}`}>
                           <Button variant="outline" size="sm">
                             <Eye className="h-4 w-4 mr-1" />
-                            Voir
+                            Voir les dossiers
                           </Button>
                         </Link>
                       </div>

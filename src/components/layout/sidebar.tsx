@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   MessageSquare,
   ChevronRight,
+  Building2,
 } from 'lucide-react'
 import { useUserAvatar } from '@/contexts/user-avatar-context'
 import { useSoundToggle, useSound } from '@/hooks/use-sound'
@@ -24,16 +25,13 @@ interface SidebarProps {
     email: string
     role: string
   }
-  dossier?: {
-    id: string
-    reference: string
-  } | null
+  dossiersCount?: number
   unreadNotifications?: number
   unreadMessages?: number
   hasActionRequired?: boolean
 }
 
-export function Sidebar({ user, dossier, unreadMessages = 0, hasActionRequired = false }: SidebarProps) {
+export function Sidebar({ user, dossiersCount = 0, unreadMessages = 0, hasActionRequired = false }: SidebarProps) {
   const pathname = usePathname()
   const { avatarUrl } = useUserAvatar()
   const { soundEnabled } = useSoundToggle()
@@ -44,6 +42,7 @@ export function Sidebar({ user, dossier, unreadMessages = 0, hasActionRequired =
   }
 
   const isAdmin = user.role === 'ADMIN'
+  const isArtisan = user.role === 'ARTISAN'
 
   const clientNavItems = [
     {
@@ -51,16 +50,36 @@ export function Sidebar({ user, dossier, unreadMessages = 0, hasActionRequired =
       label: 'Accueil',
       icon: Home,
     },
-    ...(dossier
-      ? [
-          {
-            href: `/dossier/${dossier.id}`,
-            label: 'Mon dossier',
-            icon: FileText,
-            ...(hasActionRequired && { badge: 1 }),
-          },
-        ]
-      : []),
+    {
+      href: '/dossiers',
+      label: 'Mes dossiers',
+      icon: FileText,
+      ...(hasActionRequired && { badge: dossiersCount > 0 ? 1 : 0 }),
+    },
+    {
+      href: '/profil',
+      label: 'Mon profil',
+      icon: User,
+    },
+    {
+      href: '/support',
+      label: 'Aide & support',
+      icon: HelpCircle,
+    },
+  ]
+
+  const artisanNavItems = [
+    {
+      href: '/dashboard',
+      label: 'Tableau de bord',
+      icon: Home,
+    },
+    {
+      href: '/dossiers',
+      label: 'Dossiers clients',
+      icon: FileText,
+      badge: dossiersCount > 0 ? dossiersCount : undefined,
+    },
     {
       href: '/profil',
       label: 'Mon profil',
@@ -80,14 +99,14 @@ export function Sidebar({ user, dossier, unreadMessages = 0, hasActionRequired =
       icon: LayoutDashboard,
     },
     {
-      href: '/admin/clients',
-      label: 'Clients',
-      icon: User,
-    },
-    {
       href: '/admin/dossiers',
       label: 'Dossiers',
       icon: FileText,
+    },
+    {
+      href: '/admin/artisans',
+      label: 'Artisans',
+      icon: Building2,
     },
     {
       href: '/admin/messages',
@@ -97,7 +116,7 @@ export function Sidebar({ user, dossier, unreadMessages = 0, hasActionRequired =
     },
   ]
 
-  const navItems = isAdmin ? adminNavItems : clientNavItems
+  const navItems = isAdmin ? adminNavItems : isArtisan ? artisanNavItems : clientNavItems
 
   return (
     <aside className="fixed lg:sticky top-0 left-0 z-50 h-screen w-72 bg-white flex flex-col border-r border-primary-100">
@@ -125,7 +144,10 @@ export function Sidebar({ user, dossier, unreadMessages = 0, hasActionRequired =
       {/* Navigation Links */}
       <nav className="flex-1 px-3 space-y-1 overflow-y-auto">
         {navItems.map((item) => {
-          const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+          // Pour /admin, on vérifie uniquement l'égalité exacte pour éviter qu'il soit actif sur toutes les pages admin
+          const isActive = item.href === '/admin'
+            ? pathname === '/admin'
+            : pathname === item.href || pathname.startsWith(item.href + '/')
           const Icon = item.icon
 
           return (

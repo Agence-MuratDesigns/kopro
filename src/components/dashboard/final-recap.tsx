@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Alert } from '@/components/ui/alert'
-import { WORK_TYPES, formatDate, formatCurrency } from '@/lib/utils'
+import { WORK_TYPES, formatDate, formatCurrency, formatDossierStatus } from '@/lib/utils'
 import Link from 'next/link'
 import {
   CheckCircle,
@@ -21,6 +21,8 @@ import {
   Award,
   ArrowLeft,
   Loader2,
+  Eye,
+  X,
 } from 'lucide-react'
 
 interface Document {
@@ -28,6 +30,8 @@ interface Document {
   name: string
   type: string
   uploadedAt: string
+  url?: string
+  size?: number
 }
 
 interface FinalRecapProps {
@@ -63,6 +67,7 @@ const workIcons: Record<string, React.ReactNode> = {
 export function FinalRecap({ dossier, client, documents }: FinalRecapProps) {
   const [downloadingDoc, setDownloadingDoc] = useState<string | null>(null)
   const [downloadingAll, setDownloadingAll] = useState(false)
+  const [previewDocument, setPreviewDocument] = useState<Document | null>(null)
 
   const selectedWorks: string[] = dossier.selectedWorks
     ? JSON.parse(dossier.selectedWorks)
@@ -195,7 +200,7 @@ export function FinalRecap({ dossier, client, documents }: FinalRecapProps) {
             <div className="p-4 bg-gray-50 rounded-lg">
               <p className="text-sm text-gray-500">Statut global</p>
               <Badge variant={isClosed ? 'success' : 'warning'}>
-                {isClosed ? 'Clôturé' : dossier.status}
+                {isClosed ? 'Clôturé' : formatDossierStatus(dossier.status)}
               </Badge>
             </div>
           </div>
@@ -334,22 +339,55 @@ export function FinalRecap({ dossier, client, documents }: FinalRecapProps) {
                 {adminDocs.map(doc => (
                   <div
                     key={doc.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                    className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100"
                   >
-                    <div className="flex items-center gap-3">
-                      <FileText className="h-5 w-5 text-gray-400" />
-                      <div>
-                        <p className="font-medium text-gray-900">{doc.name}</p>
-                        <p className="text-sm text-gray-500">
-                          Déposé le {formatDate(doc.uploadedAt)}
-                        </p>
+                    {/* Miniature cliquable */}
+                    {doc.url && (
+                      <button
+                        type="button"
+                        onClick={() => setPreviewDocument(doc)}
+                        className="relative flex-shrink-0 w-12 h-16 bg-white border border-gray-200 rounded-md overflow-hidden hover:border-primary-400 hover:shadow-md transition-all cursor-pointer group"
+                      >
+                        <iframe
+                          src={doc.url}
+                          className="w-full h-full pointer-events-none scale-100"
+                          title={`Aperçu de ${doc.name}`}
+                        />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                          <Eye className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" />
+                        </div>
+                      </button>
+                    )}
+                    {/* Informations du fichier */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                        <span className="font-medium text-gray-900 truncate">
+                          {doc.name}
+                        </span>
                       </div>
+                      <p className="text-sm text-gray-500 ml-6">
+                        Déposé le {formatDate(doc.uploadedAt)}
+                        {doc.size && ` • ${(doc.size / 1024).toFixed(1)} Ko`}
+                      </p>
+                      {doc.url && (
+                        <button
+                          type="button"
+                          onClick={() => setPreviewDocument(doc)}
+                          className="text-xs text-primary-600 hover:text-primary-700 mt-1 ml-6 flex items-center gap-1"
+                        >
+                          <Eye className="h-3 w-3" />
+                          Voir l'aperçu
+                        </button>
+                      )}
                     </div>
+                    {/* Bouton télécharger */}
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => handleDownloadDocument(doc.id, doc.name)}
                       disabled={downloadingDoc === doc.id}
+                      className="flex-shrink-0"
                     >
                       {downloadingDoc === doc.id ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -373,23 +411,58 @@ export function FinalRecap({ dossier, client, documents }: FinalRecapProps) {
                 {techDocs.map(doc => (
                   <div
                     key={doc.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                    className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100"
                   >
-                    <div className="flex items-center gap-3">
-                      <FileText className="h-5 w-5 text-gray-400" />
-                      <div>
-                        <p className="font-medium text-gray-900">{doc.name}</p>
-                        <p className="text-sm text-gray-500">
-                          {doc.type === 'DEVIS' ? 'Devis' : 'Facture'} - Déposé le{' '}
-                          {formatDate(doc.uploadedAt)}
-                        </p>
+                    {/* Miniature cliquable */}
+                    {doc.url && (
+                      <button
+                        type="button"
+                        onClick={() => setPreviewDocument(doc)}
+                        className="relative flex-shrink-0 w-12 h-16 bg-white border border-gray-200 rounded-md overflow-hidden hover:border-primary-400 hover:shadow-md transition-all cursor-pointer group"
+                      >
+                        <iframe
+                          src={doc.url}
+                          className="w-full h-full pointer-events-none scale-100"
+                          title={`Aperçu de ${doc.name}`}
+                        />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                          <Eye className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" />
+                        </div>
+                      </button>
+                    )}
+                    {/* Informations du fichier */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                        <span className="font-medium text-gray-900 truncate">
+                          {doc.name}
+                        </span>
+                        <Badge variant={doc.type === 'DEVIS' ? 'secondary' : 'success'} className="flex-shrink-0">
+                          {doc.type === 'DEVIS' ? 'Devis' : 'Facture'}
+                        </Badge>
                       </div>
+                      <p className="text-sm text-gray-500 ml-6">
+                        Déposé le {formatDate(doc.uploadedAt)}
+                        {doc.size && ` • ${(doc.size / 1024).toFixed(1)} Ko`}
+                      </p>
+                      {doc.url && (
+                        <button
+                          type="button"
+                          onClick={() => setPreviewDocument(doc)}
+                          className="text-xs text-primary-600 hover:text-primary-700 mt-1 ml-6 flex items-center gap-1"
+                        >
+                          <Eye className="h-3 w-3" />
+                          Voir l'aperçu
+                        </button>
+                      )}
                     </div>
+                    {/* Bouton télécharger */}
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => handleDownloadDocument(doc.id, doc.name)}
                       disabled={downloadingDoc === doc.id}
+                      className="flex-shrink-0"
                     >
                       {downloadingDoc === doc.id ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -416,6 +489,91 @@ export function FinalRecap({ dossier, client, documents }: FinalRecapProps) {
           </Button>
         </Link>
       </div>
+
+      {/* Modal d'aperçu du fichier */}
+      {previewDocument && previewDocument.url && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={() => setPreviewDocument(null)}
+        >
+          <div
+            className="relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-scale-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header de la modal */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary-100 rounded-lg">
+                  <FileText className="h-5 w-5 text-primary-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900 truncate max-w-md">
+                    {previewDocument.name}
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    {previewDocument.size
+                      ? `${(previewDocument.size / 1024).toFixed(1)} Ko • PDF`
+                      : 'PDF'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleDownloadDocument(previewDocument.id, previewDocument.name)}
+                  disabled={downloadingDoc === previewDocument.id}
+                >
+                  {downloadingDoc === previewDocument.id ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4 mr-2" />
+                  )}
+                  Télécharger
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewDocument(null)}
+                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Contenu de l'aperçu */}
+            <div className="flex-1 overflow-hidden bg-gray-100 p-4">
+              <iframe
+                src={previewDocument.url}
+                className="w-full h-full min-h-[60vh] rounded-lg border border-gray-200 bg-white"
+                title="Aperçu du document"
+              />
+            </div>
+
+            {/* Footer de la modal */}
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50">
+              <Button
+                variant="outline"
+                onClick={() => setPreviewDocument(null)}
+              >
+                Fermer
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => handleDownloadDocument(previewDocument.id, previewDocument.name)}
+                disabled={downloadingDoc === previewDocument.id}
+              >
+                {downloadingDoc === previewDocument.id ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4 mr-2" />
+                )}
+                Télécharger le fichier
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

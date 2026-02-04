@@ -81,10 +81,15 @@ export function MprIdentifierForm({
         return
       }
 
-      setSuccess('Identifiant enregistré. Votre dossier est en attente de validation.')
+      // Auto-validation : redirection vers l'étape suivante
+      setSuccess('Identifiant enregistré avec succès ! Passez à l\'étape suivante.')
       setIsEditing(false)
       setIsCertified(false)
-      router.refresh()
+
+      // Rediriger vers l'étape infos projet après un court délai
+      setTimeout(() => {
+        router.push(`/dossier/${dossierId}/etape/PROJECT_INFO`)
+      }, 1500)
     } catch {
       setError('Erreur de connexion au serveur')
     } finally {

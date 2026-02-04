@@ -13,6 +13,12 @@
   --grey: #bcbcbc;
   --light-purple: #e6ddff;
   --success: #1cc562;
+
+  /* RGB values for opacity support */
+  --success-rgb: 28, 197, 98;
+  --accent-2-rgb: 251, 160, 69;
+  --required-rgb: 241, 97, 97;
+  --accent-rgb: 118, 69, 251;
 }
 
 @layer base {
@@ -242,6 +248,37 @@
 }
 
 @layer utilities {
+  /* Status background colors with opacity */
+  .bg-success-10 {
+    background-color: rgba(var(--success-rgb), 0.1);
+  }
+  .bg-success-15 {
+    background-color: rgba(var(--success-rgb), 0.15);
+  }
+  .bg-accent2-10 {
+    background-color: rgba(var(--accent-2-rgb), 0.1);
+  }
+  .bg-accent2-15 {
+    background-color: rgba(var(--accent-2-rgb), 0.15);
+  }
+  .bg-required-10 {
+    background-color: rgba(var(--required-rgb), 0.1);
+  }
+  .bg-required-15 {
+    background-color: rgba(var(--required-rgb), 0.15);
+  }
+
+  /* Status border colors with opacity */
+  .border-success-50 {
+    border-color: rgba(var(--success-rgb), 0.5);
+  }
+  .border-accent2-40 {
+    border-color: rgba(var(--accent-2-rgb), 0.4);
+  }
+  .border-required-40 {
+    border-color: rgba(var(--required-rgb), 0.4);
+  }
+
   .gradient-primary {
     background: linear-gradient(135deg, var(--accent), #9b6dff);
   }

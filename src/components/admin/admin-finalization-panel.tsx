@@ -75,6 +75,18 @@ export function AdminFinalizationPanel({
     amounts.mprAmount !== (mprAmount || 0) ||
     amounts.ceeAmount !== (ceeAmount || 0)
 
+  // Check if payment form has changed
+  const paymentFormChanged =
+    paymentForm.paymentStatus !== (paymentStatus || 'PENDING') ||
+    paymentForm.mprPaidAmount !== (mprPaidAmount || 0) ||
+    paymentForm.ceePaidAmount !== (ceePaidAmount || 0)
+
+  // Check if payment is completed (required for closure)
+  const isPaymentCompleted = paymentForm.paymentStatus === 'PAID'
+
+  // Can only close if all steps are validated AND payment is completed
+  const canClose = isClosable && isPaymentCompleted
+
   const handleSaveAmounts = async () => {
     setIsSavingAmounts(true)
     setError(null)
@@ -262,44 +274,8 @@ export function AdminFinalizationPanel({
         </Card>
       )}
 
-      {/* Finalization Section */}
-      {!isClosed && (
-        <Card className={isClosable ? 'border-green-200 bg-green-50' : 'border-gray-200'}>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Lock className="h-5 w-5" />
-              Clôture du dossier
-            </CardTitle>
-            <CardDescription>
-              Finalisez le dossier une fois toutes les étapes validées
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {!allStepsValidated && (
-              <Alert variant="warning" title="Étapes manquantes">
-                Toutes les étapes doivent être validées avant de pouvoir clôturer le dossier.
-              </Alert>
-            )}
-
-            <Button
-              onClick={handleFinalize}
-              disabled={!isClosable || isLoading}
-              className="w-full"
-              size="lg"
-            >
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <CheckCircle className="h-4 w-4 mr-2" />
-              )}
-              Clôturer le dossier
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Payment Status Section (visible when closed) */}
-      {isClosed && (
+      {/* Payment Status Section (visible when all steps are validated OR when closed) */}
+      {(allStepsValidated || isClosed) && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
@@ -387,16 +363,73 @@ export function AdminFinalizationPanel({
 
             <Button
               onClick={handlePaymentUpdate}
-              disabled={isUpdatingPayment}
+              disabled={isUpdatingPayment || !paymentFormChanged}
               className="w-full"
             >
               {isUpdatingPayment ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              Enregistrer le versement
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Finalization Section - Only when not closed */}
+      {!isClosed && allStepsValidated && (
+        <Card className={canClose ? 'border-green-200 bg-green-50' : 'border-gray-200'}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Lock className="h-5 w-5" />
+              Clôture du dossier
+            </CardTitle>
+            <CardDescription>
+              Finalisez le dossier une fois toutes les étapes validées et les versements effectués
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {!isPaymentCompleted && (
+              <Alert variant="warning" title="Versement requis">
+                Les versements doivent être marqués comme "Versé" avant de pouvoir clôturer le dossier.
+              </Alert>
+            )}
+
+            {isPaymentCompleted && (
+              <Alert variant="success" title="Prêt pour la clôture">
+                Toutes les conditions sont remplies. Vous pouvez clôturer le dossier.
+              </Alert>
+            )}
+
+            <Button
+              onClick={handleFinalize}
+              disabled={!canClose || isLoading}
+              className="w-full"
+              size="lg"
+            >
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
                 <CheckCircle className="h-4 w-4 mr-2" />
               )}
-              Mettre à jour le versement
+              Clôturer le dossier
             </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Closed status display */}
+      {isClosed && (
+        <Card className="border-green-200 bg-green-50">
+          <CardContent className="py-6">
+            <div className="flex items-center gap-3 text-green-700">
+              <CheckCircle className="h-6 w-6" />
+              <div>
+                <p className="font-semibold">Dossier clôturé</p>
+                <p className="text-sm text-green-600">Ce dossier a été finalisé avec succès.</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
       )}

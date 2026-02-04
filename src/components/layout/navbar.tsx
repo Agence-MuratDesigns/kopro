@@ -4,7 +4,6 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
 import {
   Home,
   FileText,
@@ -13,9 +12,10 @@ import {
   LogOut,
   Menu,
   X,
-  Settings,
-  Users,
   BarChart3,
+  Settings,
+  ChevronDown,
+  Building2,
 } from 'lucide-react'
 import { SoundToggle } from './sound-toggle'
 
@@ -44,7 +44,7 @@ export function Navbar({ user }: NavbarProps) {
   const adminLinks = [
     { href: '/admin', label: 'Dashboard', icon: BarChart3 },
     { href: '/admin/dossiers', label: 'Dossiers', icon: FileText },
-    { href: '/admin/clients', label: 'Clients', icon: Users },
+    { href: '/admin/artisans', label: 'Artisans', icon: Building2 },
     { href: '/admin/messages', label: 'Messages', icon: MessageSquare },
     { href: '/admin/settings', label: 'Paramètres', icon: Settings },
   ]
@@ -70,7 +70,10 @@ export function Navbar({ user }: NavbarProps) {
           <div className="hidden md:flex items-center space-x-1">
             {links.map((link) => {
               const Icon = link.icon
-              const isActive = pathname === link.href || pathname.startsWith(link.href + '/')
+              // Pour /admin et /dashboard, on vérifie uniquement l'égalité exacte
+              const isActive = (link.href === '/admin' || link.href === '/dashboard')
+                ? pathname === link.href
+                : pathname === link.href || pathname.startsWith(link.href + '/')
               return (
                 <Link
                   key={link.href}
@@ -92,18 +95,31 @@ export function Navbar({ user }: NavbarProps) {
           {/* User Menu */}
           <div className="hidden md:flex items-center gap-4">
             <SoundToggle />
-            <div className="text-right">
-              <p className="text-sm font-medium text-[var(--dark)]">
-                {user.firstName} {user.lastName}
-              </p>
-              <p className="text-xs text-[var(--grey)]">{user.email}</p>
+            <div className="relative group">
+              <div className="flex items-center gap-2 cursor-pointer py-2 px-3 rounded-xl transition-colors hover:bg-[var(--light-purple)]/50">
+                <div className="text-right">
+                  <p className="text-sm font-medium text-[var(--dark)]">
+                    {user.firstName} {user.lastName}
+                  </p>
+                  <p className="text-xs text-[var(--grey)]">{user.email}</p>
+                </div>
+                <ChevronDown className="h-4 w-4 text-[var(--grey)] transition-transform duration-200 group-hover:rotate-180" />
+              </div>
+              {/* Dropdown au survol */}
+              <div className="absolute right-0 top-full pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                <div className="bg-white rounded-xl shadow-lg border border-[var(--light-purple)] py-2 min-w-[160px]">
+                  <form action="/api/auth/logout" method="POST">
+                    <button
+                      type="submit"
+                      className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-[var(--required)] hover:bg-red-50 transition-colors"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Déconnexion
+                    </button>
+                  </form>
+                </div>
+              </div>
             </div>
-            <form action="/api/auth/logout" method="POST">
-              <Button variant="ghost" size="sm" type="submit">
-                <LogOut className="h-4 w-4 mr-2" />
-                Déconnexion
-              </Button>
-            </form>
           </div>
 
           {/* Mobile menu button */}

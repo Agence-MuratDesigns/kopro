@@ -4,22 +4,35 @@ import React, { createContext, useContext, useState, useCallback } from 'react'
 
 interface ChatContextType {
   isOpen: boolean
-  openChat: () => void
+  pendingDossierId: string | null
+  pendingMessage: string | null
+  openChat: (dossierId?: string, message?: string) => void
   closeChat: () => void
   toggleChat: () => void
+  clearPending: () => void
 }
 
 const ChatContext = createContext<ChatContextType | null>(null)
 
 export function ChatProvider({ children }: { children: React.ReactNode }) {
   const [isOpen, setIsOpen] = useState(false)
+  const [pendingDossierId, setPendingDossierId] = useState<string | null>(null)
+  const [pendingMessage, setPendingMessage] = useState<string | null>(null)
 
-  const openChat = useCallback(() => setIsOpen(true), [])
+  const openChat = useCallback((dossierId?: string, message?: string) => {
+    if (dossierId) setPendingDossierId(dossierId)
+    if (message) setPendingMessage(message)
+    setIsOpen(true)
+  }, [])
   const closeChat = useCallback(() => setIsOpen(false), [])
   const toggleChat = useCallback(() => setIsOpen(prev => !prev), [])
+  const clearPending = useCallback(() => {
+    setPendingDossierId(null)
+    setPendingMessage(null)
+  }, [])
 
   return (
-    <ChatContext.Provider value={{ isOpen, openChat, closeChat, toggleChat }}>
+    <ChatContext.Provider value={{ isOpen, pendingDossierId, pendingMessage, openChat, closeChat, toggleChat, clearPending }}>
       {children}
     </ChatContext.Provider>
   )

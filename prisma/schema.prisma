@@ -3,11 +3,12 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
-// Utilisateur (client ou admin KOPRO)
+// Utilisateur (client, artisan ou admin KOPRO)
 model User {
   id              String    @id @default(cuid())
   email           String    @unique
@@ -15,13 +16,14 @@ model User {
   firstName       String
   lastName        String
   phone           String?
-  role            String    @default("CLIENT")
+  role            String    @default("CLIENT") // CLIENT, ADMIN, ARTISAN
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   createdById     String?   // ID de l'admin qui a créé le compte
   firstLoginAt    DateTime? // Date de première connexion
   mustChangePassword Boolean @default(true) // Doit changer son mot de passe à la première connexion
   lastLoginAt     DateTime? // Dernière connexion
+  isActive        Boolean   @default(true) // Compte actif ou désactivé
 
   // Profil client
   address         String?   // Adresse postale
@@ -29,6 +31,14 @@ model User {
   postalCode      String?   // Code postal
   city            String?   // Ville
   avatarUrl       String?   // URL de l'avatar
+
+  // Champs spécifiques Artisan (utilisés si role = 'ARTISAN')
+  companyName       String?   // Raison sociale
+  siret             String?   // SIRET (14 chiffres)
+  companyAddress    String?   // Adresse entreprise
+  companyPostalCode String?   // Code postal entreprise
+  companyCity       String?   // Ville entreprise
+  rgeQualifications String?   // JSON array des certifications RGE
 
   // Préférences utilisateur
   soundEnabled        Boolean @default(true)  // Sons activés
@@ -39,10 +49,12 @@ model User {
   // Relations
   dossiers         Dossier[]           @relation("ClientDossiers")
   assignedDossiers Dossier[]           @relation("AssignedDossiers")
+  managedDossiers  Dossier[]           @relation("ArtisanManagedDossiers") // Dossiers gérés par l'artisan
   messages         Message[]
   notifications    Notification[]
   documents        Document[]
   activityLogs     ActivityLog[]
+  payments         Payment[]
 
   @@map("users")
 }
@@ -65,31 +77,48 @@ model Dossier {
   mprReviewedById   String?   // Admin qui a validé/refusé
   mprCertified      Boolean   @default(false) // Client a certifié l'identifiant
 
-  // Mandat - Étape 3
+  // Infos projet - Étape 3 (nouvelle)
+  projectInfoStatus       String    @default("DRAFT") // DRAFT, PENDING_REVIEW, APPROVED, REJECTED
+  projectInfoSubmittedAt  DateTime? // Date de soumission
+  projectInfoReviewedAt   DateTime? // Date de validation/refus admin
+  projectInfoReviewMessage String?  // Message admin en cas de rejet
+  projectInfoLastSavedAt  DateTime? // Dernière sauvegarde brouillon
+  energyType              String?   // ELECTRICITY, GAS, FUEL, WOOD, OTHER
+  housingType             String?   // HOUSE, APARTMENT
+  housingSurface          Float?    // Surface en m²
+  constructionYear        Int?      // Année de construction
+  ownershipStatus         String?   // OWNER, TENANT
+
+  // Paiement - Étape 4
+  servicePaymentStatus      String    @default("DRAFT") // DRAFT, PENDING, SUCCEEDED, FAILED
+  servicePaymentAmount      Int?      // Montant en centimes
+  servicePaymentCompletedAt DateTime? // Date de paiement
+
+  // Mandat - Étape 5
   mandatStatus      String    @default("DRAFT") // DRAFT, PENDING_REVIEW, APPROVED, REJECTED
   mandatSignedAt    DateTime? // Date de signature
   mandatMethod      String?   // MANUAL, ELECTRONIC
   mandatReviewMessage String? // Message admin en cas de rejet
 
-  // Travaux sélectionnés - Étape 4 (JSON array)
+  // Travaux sélectionnés - Étape 5 (JSON array)
   selectedWorks     String?   // ["ISOLATION", "HEATING", "HOT_WATER", "VENTILATION"]
   worksSelectedAt   DateTime? // Date de sélection
 
-  // Devis - Étape 5
+  // Devis - Étape 6
   quotesStatus      String    @default("DRAFT") // DRAFT, PENDING_REVIEW, APPROVED, REJECTED
   quotesSubmittedAt DateTime? // Date de soumission
   quotesReviewMessage String? // Message admin en cas de rejet
 
-  // Autorisation travaux - Étape 6
+  // Démarrage travaux - Étape 7
   workStartedAt     DateTime? // Date de notification début travaux
   workStatus        String    @default("NOT_STARTED") // NOT_STARTED, IN_PROGRESS, COMPLETED
 
-  // Factures - Étape 7
+  // Factures - Étape 8
   invoicesStatus    String    @default("DRAFT") // DRAFT, PENDING_REVIEW, APPROVED, REJECTED
   invoicesSubmittedAt DateTime? // Date de soumission
   invoicesReviewMessage String? // Message admin en cas de rejet
 
-  // Clôture - Étape 8
+  // Clôture - Étape 9
   closedAt          DateTime? // Date de clôture
   closedById        String?   // Admin qui a clôturé
 
@@ -116,10 +145,21 @@ model Dossier {
   updatedAt         DateTime  @updatedAt
 
   // Relations
-  clientId          String    // Un client peut avoir plusieurs dossiers
-  client            User      @relation("ClientDossiers", fields: [clientId], references: [id])
+  clientId          String?   // Client qui gère son propre dossier (null si géré par artisan)
+  client            User?     @relation("ClientDossiers", fields: [clientId], references: [id])
   advisorId         String?
   advisor           User?     @relation("AssignedDossiers", fields: [advisorId], references: [id])
+  artisanId         String?   // Artisan qui gère ce dossier (null si client direct)
+  artisan           User?     @relation("ArtisanManagedDossiers", fields: [artisanId], references: [id])
+
+  // Infos client final (pour dossiers artisan où le client n'a pas de compte)
+  endClientFirstName    String?
+  endClientLastName     String?
+  endClientEmail        String?
+  endClientPhone        String?
+  endClientAddress      String?
+  endClientPostalCode   String?
+  endClientCity         String?
 
   steps             DossierStep[]
   documents         Document[]
@@ -127,6 +167,7 @@ model Dossier {
   notifications     Notification[]
   activityLogs      ActivityLog[]
   mprHistory        MprHistory[]
+  payments          Payment[]
 
   @@map("dossiers")
 }
@@ -147,7 +188,7 @@ model MprHistory {
   @@map("mpr_history")
 }
 
-// Étape type (template) - Les 8 étapes du parcours
+// Étape type (template) - Les 9 étapes du parcours
 model StepTemplate {
   id              String    @id @default(cuid())
   code            String    @unique
@@ -267,4 +308,31 @@ model ActivityLog {
   dossier         Dossier?  @relation(fields: [dossierId], references: [id], onDelete: Cascade)
 
   @@map("activity_logs")
+}
+
+// Paiement Stripe
+model Payment {
+  id                String    @id @default(cuid())
+  amount            Int       // Montant en centimes (29000 = 290€)
+  currency          String    @default("eur")
+  status            String    @default("PENDING") // PENDING, PROCESSING, SUCCEEDED, FAILED
+
+  stripeSessionId   String?   @unique
+  stripePaymentId   String?   @unique
+
+  description       String?
+  customerEmail     String?
+
+  createdAt         DateTime  @default(now())
+  paidAt            DateTime?
+  failedAt          DateTime?
+  errorMessage      String?
+
+  // Relations
+  dossierId         String
+  dossier           Dossier   @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+  userId            String?
+  user              User?     @relation(fields: [userId], references: [id])
+
+  @@map("payments")
 }

@@ -26,7 +26,7 @@ const faqCategories = [
     items: [
       {
         question: "Comment fonctionne le parcours KOPRO ?",
-        answer: "Le parcours KOPRO se déroule en 8 étapes : création de votre compte par notre équipe, saisie de votre identifiant MaPrimeRénov', signature du mandat, sélection des travaux, dépôt des devis, autorisation des travaux, dépôt des factures, et récapitulatif final. Chaque étape doit être validée avant de passer à la suivante."
+        answer: "Le parcours KOPRO se déroule en 8 étapes : création de votre compte par notre équipe, saisie de votre identifiant MaPrimeRénov', signature du mandat, sélection des travaux, dépôt des devis, démarrage des travaux, dépôt des factures, et récapitulatif final. Chaque étape doit être validée avant de passer à la suivante."
       },
       {
         question: "Qu'est-ce que l'identifiant MaPrimeRénov' ?",

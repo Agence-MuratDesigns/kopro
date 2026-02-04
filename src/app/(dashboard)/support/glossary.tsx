@@ -93,10 +93,17 @@ const glossaryTerms = [
     term: 'Étapes',
     fullName: null,
     category: 'Parcours',
-    definition: 'Le parcours KOPRO comprend 8 étapes : création compte, identifiant MPR, signature mandat, sélection travaux, dépôt devis, autorisation travaux, dépôt factures, récapitulatif final.',
-    related: ['Dossier', 'Guide interactif'],
+    definition: 'Le parcours KOPRO comprend 10 étapes : création compte, identifiant MPR, informations projet, paiement des frais, signature mandat, sélection travaux, dépôt devis, démarrage travaux, dépôt factures, récapitulatif final.',
+    related: ['Dossier', 'Guide interactif', 'Frais d\'accompagnement'],
   },
   // === F ===
+  {
+    term: 'Frais d\'accompagnement',
+    fullName: null,
+    category: 'Finance',
+    definition: 'Montant de 290 € à régler pour bénéficier de l\'accompagnement KOPRO. Ce paiement unique couvre la constitution et le suivi de votre dossier MaPrimeRénov\' et CEE de A à Z.',
+    related: ['KOPRO', 'Stripe', 'Étape 4'],
+  },
   {
     term: 'Facture',
     fullName: null,
@@ -185,6 +192,14 @@ const glossaryTerms = [
     category: 'Aide',
     definition: 'Autre nom des aides CEE versées par les fournisseurs d\'énergie. Cumulable avec MaPrimeRénov\' pour réduire significativement le reste à charge.',
     related: ['CEE', 'Obligés', 'Aides financières'],
+  },
+  // === S ===
+  {
+    term: 'Stripe',
+    fullName: null,
+    category: 'Service',
+    definition: 'Plateforme de paiement sécurisée utilisée par KOPRO pour le règlement des frais d\'accompagnement. Vos données bancaires sont cryptées et ne transitent jamais par nos serveurs.',
+    related: ['Frais d\'accompagnement', 'Paiement sécurisé'],
   },
   // === R ===
   {

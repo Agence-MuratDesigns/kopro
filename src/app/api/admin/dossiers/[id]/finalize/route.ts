@@ -71,17 +71,20 @@ export async function POST(request: NextRequest, context: Context) {
       })
     }
 
-    // Create notification for client
-    await prisma.notification.create({
-      data: {
-        userId: dossier.clientId,
-        dossierId: id,
-        type: 'STEP_COMPLETED',
-        title: 'Dossier clôturé',
-        message: `Votre dossier ${dossier.reference} est désormais complet. Les démarches pour le versement des aides sont en cours.`,
-        link: `/dossier/${id}/etape/FINAL_RECAP`,
-      },
-    })
+    // Create notification for client or artisan
+    const notifyUserId = dossier.clientId || dossier.artisanId
+    if (notifyUserId) {
+      await prisma.notification.create({
+        data: {
+          userId: notifyUserId,
+          dossierId: id,
+          type: 'STEP_COMPLETED',
+          title: 'Dossier clôturé',
+          message: `Le dossier ${dossier.reference} est désormais complet. Les démarches pour le versement des aides sont en cours.`,
+          link: `/dossier/${id}/etape/FINAL_RECAP`,
+        },
+      })
+    }
 
     // Create activity log
     await prisma.activityLog.create({

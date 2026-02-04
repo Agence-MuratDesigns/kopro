@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireRole } from '@/lib/auth'
-import { sendEventToUser } from '@/app/api/realtime/events/route'
+import { sendEventToUser } from '@/lib/realtime'
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -53,6 +53,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       )
     }
 
+    const notifyUserId = dossier.clientId || dossier.artisanId
+
     if (action === 'APPROVE') {
       await prisma.$transaction(async (tx) => {
         // Update dossier
@@ -84,17 +86,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             data: { status: 'AVAILABLE' },
           })
 
-          // Notify client about next step
-          await tx.notification.create({
-            data: {
-              userId: dossier.clientId,
-              dossierId,
-              type: 'STEP_AVAILABLE',
-              title: 'Nouvelle étape disponible',
-              message: `L'étape "${nextStep.template.name}" est maintenant accessible.`,
-              link: `/dossier/${dossierId}/etape/${nextStep.template.code}`,
-            },
-          })
+          // Notify client about next step (only if there's a user to notify)
+          if (notifyUserId) {
+            await tx.notification.create({
+              data: {
+                userId: notifyUserId,
+                dossierId,
+                type: 'STEP_AVAILABLE',
+                title: 'Nouvelle étape disponible',
+                message: `L'étape "${nextStep.template.name}" est maintenant accessible.`,
+                link: `/dossier/${dossierId}/etape/${nextStep.template.code}`,
+              },
+            })
+          }
         }
 
         // Log in MPR history
@@ -109,17 +113,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           },
         })
 
-        // Notify client
-        await tx.notification.create({
-          data: {
-            userId: dossier.clientId,
-            dossierId,
-            type: 'MPR_APPROVED',
-            title: 'Identifiant MaPrimeRénov\' validé',
-            message: 'Votre identifiant MaPrimeRénov\' a été vérifié et validé. Vous pouvez passer à l\'étape suivante.',
-            link: `/dossier/${dossierId}`,
-          },
-        })
+        // Notify client (only if there's a user to notify)
+        if (notifyUserId) {
+          await tx.notification.create({
+            data: {
+              userId: notifyUserId,
+              dossierId,
+              type: 'MPR_APPROVED',
+              title: 'Identifiant MaPrimeRénov\' validé',
+              message: 'Votre identifiant MaPrimeRénov\' a été vérifié et validé. Vous pouvez passer à l\'étape suivante.',
+              link: `/dossier/${dossierId}`,
+            },
+          })
+        }
 
         // Log activity
         await tx.activityLog.create({
@@ -132,20 +138,22 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         })
       })
 
-      // Send real-time notification to client
-      sendEventToUser(dossier.clientId, 'notification', {
-        type: 'MPR_APPROVED',
-        title: 'Identifiant valide',
-        message: 'Votre identifiant MaPrimeRenov\' a ete verifie et valide.',
-      })
+      // Send real-time notification to client (only if there's a user to notify)
+      if (notifyUserId) {
+        sendEventToUser(notifyUserId, 'notification', {
+          type: 'MPR_APPROVED',
+          title: 'Identifiant valide',
+          message: 'Votre identifiant MaPrimeRenov\' a ete verifie et valide.',
+        })
 
-      // Send step update event for real-time UI update
-      sendEventToUser(dossier.clientId, 'step_update', {
-        dossierId,
-        stepCode: 'IDENTIFIANT_MPR',
-        status: 'VALIDATED',
-        action: 'approved',
-      })
+        // Send step update event for real-time UI update
+        sendEventToUser(notifyUserId, 'step_update', {
+          dossierId,
+          stepCode: 'IDENTIFIANT_MPR',
+          status: 'VALIDATED',
+          action: 'approved',
+        })
+      }
 
       return NextResponse.json({
         success: true,
@@ -194,17 +202,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           },
         })
 
-        // Notify client
-        await tx.notification.create({
-          data: {
-            userId: dossier.clientId,
-            dossierId,
-            type: 'MPR_REJECTED',
-            title: 'Identifiant MaPrimeRénov\' rejeté',
-            message: `Votre identifiant a été rejeté : ${message}. Veuillez le corriger.`,
-            link: `/dossier/${dossierId}/etape/MPR_IDENTIFIER`,
-          },
-        })
+        // Notify client (only if there's a user to notify)
+        if (notifyUserId) {
+          await tx.notification.create({
+            data: {
+              userId: notifyUserId,
+              dossierId,
+              type: 'MPR_REJECTED',
+              title: 'Identifiant MaPrimeRénov\' rejeté',
+              message: `Votre identifiant a été rejeté : ${message}. Veuillez le corriger.`,
+              link: `/dossier/${dossierId}/etape/MPR_IDENTIFIER`,
+            },
+          })
+        }
 
         // Log activity
         await tx.activityLog.create({
@@ -217,21 +227,23 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         })
       })
 
-      // Send real-time notification to client
-      sendEventToUser(dossier.clientId, 'notification', {
-        type: 'MPR_REJECTED',
-        title: 'Identifiant rejete',
-        message: `Votre identifiant a ete rejete : ${message}`,
-      })
+      // Send real-time notification to client (only if there's a user to notify)
+      if (notifyUserId) {
+        sendEventToUser(notifyUserId, 'notification', {
+          type: 'MPR_REJECTED',
+          title: 'Identifiant rejete',
+          message: `Votre identifiant a ete rejete : ${message}`,
+        })
 
-      // Send step update event for real-time UI update
-      sendEventToUser(dossier.clientId, 'step_update', {
-        dossierId,
-        stepCode: 'IDENTIFIANT_MPR',
-        status: 'REJECTED',
-        action: 'rejected',
-        message,
-      })
+        // Send step update event for real-time UI update
+        sendEventToUser(notifyUserId, 'step_update', {
+          dossierId,
+          stepCode: 'IDENTIFIANT_MPR',
+          status: 'REJECTED',
+          action: 'rejected',
+          message,
+        })
+      }
 
       return NextResponse.json({
         success: true,

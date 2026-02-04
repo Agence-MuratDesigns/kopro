@@ -36,9 +36,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Dossier non trouvé' }, { status: 404 })
     }
 
-    if (dossier.quotesStatus !== 'PENDING_REVIEW') {
+    // Pour l'approbation, vérifier que les devis sont en attente
+    if (action === 'APPROVE' && dossier.quotesStatus !== 'PENDING_REVIEW') {
       return NextResponse.json(
         { error: 'Les devis ne sont pas en attente de validation' },
+        { status: 400 }
+      )
+    }
+
+    // Pour le rejet, autoriser PENDING_REVIEW ou si déjà rejeté (re-rejet avec nouveau message)
+    if (action === 'REJECT' && !['PENDING_REVIEW', 'REJECTED'].includes(dossier.quotesStatus || '')) {
+      return NextResponse.json(
+        { error: 'Les devis ne peuvent pas être rejetés dans cet état' },
         { status: 400 }
       )
     }
@@ -59,6 +68,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         type: 'DEVIS',
       },
     })
+
+    const notifyUserId = dossier.clientId || dossier.artisanId
 
     if (action === 'APPROVE') {
       await prisma.$transaction(async (tx) => {
@@ -102,30 +113,34 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             data: { status: 'AVAILABLE' },
           })
 
-          // Notify client about next step
+          // Notify client about next step (only if there's a user to notify)
+          if (notifyUserId) {
+            await tx.notification.create({
+              data: {
+                userId: notifyUserId,
+                dossierId,
+                type: 'STEP_AVAILABLE',
+                title: 'Nouvelle étape disponible',
+                message: `L'étape "${nextStep.template.name}" est maintenant accessible.`,
+                link: `/dossier/${dossierId}/etape/${nextStep.template.code}`,
+              },
+            })
+          }
+        }
+
+        // Notify client about quotes validation (only if there's a user to notify)
+        if (notifyUserId) {
           await tx.notification.create({
             data: {
-              userId: dossier.clientId,
+              userId: notifyUserId,
               dossierId,
-              type: 'STEP_AVAILABLE',
-              title: 'Nouvelle étape disponible',
-              message: `L'étape "${nextStep.template.name}" est maintenant accessible.`,
-              link: `/dossier/${dossierId}/etape/${nextStep.template.code}`,
+              type: 'STEP_VALIDATED',
+              title: 'Devis validés',
+              message: 'Vos devis ont été vérifiés et validés. Vous pouvez passer à l\'étape suivante.',
+              link: `/dossier/${dossierId}`,
             },
           })
         }
-
-        // Notify client about quotes validation
-        await tx.notification.create({
-          data: {
-            userId: dossier.clientId,
-            dossierId,
-            type: 'STEP_VALIDATED',
-            title: 'Devis validés',
-            message: 'Vos devis ont été vérifiés et validés. Vous pouvez passer à l\'étape suivante.',
-            link: `/dossier/${dossierId}`,
-          },
-        })
 
         // Log activity
         await tx.activityLog.create({
@@ -182,17 +197,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           },
         })
 
-        // Notify client about rejection
-        await tx.notification.create({
-          data: {
-            userId: dossier.clientId,
-            dossierId,
-            type: 'STEP_REJECTED',
-            title: 'Devis rejetés',
-            message: `Vos devis ont été rejetés : ${message}. Veuillez les corriger et redéposer.`,
-            link: `/dossier/${dossierId}/etape/QUOTE_DEPOSIT`,
-          },
-        })
+        // Notify client about rejection (only if there's a user to notify)
+        if (notifyUserId) {
+          await tx.notification.create({
+            data: {
+              userId: notifyUserId,
+              dossierId,
+              type: 'STEP_REJECTED',
+              title: 'Devis rejetés',
+              message: `Vos devis ont été rejetés : ${message}. Veuillez les corriger et redéposer.`,
+              link: `/dossier/${dossierId}/etape/QUOTE_DEPOSIT`,
+            },
+          })
+        }
 
         // Log activity
         await tx.activityLog.create({

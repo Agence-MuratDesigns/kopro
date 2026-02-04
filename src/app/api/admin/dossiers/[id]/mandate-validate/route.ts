@@ -52,6 +52,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       )
     }
 
+    const notifyUserId = dossier.clientId || dossier.artisanId
+
     if (action === 'APPROVE') {
       await prisma.$transaction(async (tx) => {
         // Update dossier
@@ -94,30 +96,34 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             data: { status: 'AVAILABLE' },
           })
 
-          // Notify client about next step
+          // Notify client about next step (only if there's a user to notify)
+          if (notifyUserId) {
+            await tx.notification.create({
+              data: {
+                userId: notifyUserId,
+                dossierId,
+                type: 'STEP_AVAILABLE',
+                title: 'Nouvelle étape disponible',
+                message: `L'étape "${nextStep.template.name}" est maintenant accessible.`,
+                link: `/dossier/${dossierId}/etape/${nextStep.template.code}`,
+              },
+            })
+          }
+        }
+
+        // Notify client (only if there's a user to notify)
+        if (notifyUserId) {
           await tx.notification.create({
             data: {
-              userId: dossier.clientId,
+              userId: notifyUserId,
               dossierId,
-              type: 'STEP_AVAILABLE',
-              title: 'Nouvelle étape disponible',
-              message: `L'étape "${nextStep.template.name}" est maintenant accessible.`,
-              link: `/dossier/${dossierId}/etape/${nextStep.template.code}`,
+              type: 'MANDATE_APPROVED',
+              title: 'Mandat validé',
+              message: 'Votre mandat signé a été vérifié et validé. Vous pouvez passer à l\'étape suivante.',
+              link: `/dossier/${dossierId}`,
             },
           })
         }
-
-        // Notify client
-        await tx.notification.create({
-          data: {
-            userId: dossier.clientId,
-            dossierId,
-            type: 'MANDATE_APPROVED',
-            title: 'Mandat validé',
-            message: 'Votre mandat signé a été vérifié et validé. Vous pouvez passer à l\'étape suivante.',
-            link: `/dossier/${dossierId}`,
-          },
-        })
 
         // Log activity
         await tx.activityLog.create({
@@ -175,17 +181,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           },
         })
 
-        // Notify client
-        await tx.notification.create({
-          data: {
-            userId: dossier.clientId,
-            dossierId,
-            type: 'MANDATE_REJECTED',
-            title: 'Mandat rejeté',
-            message: `Votre mandat a été rejeté : ${message}. Veuillez le corriger.`,
-            link: `/dossier/${dossierId}/etape/MANDATE_SIGNATURE`,
-          },
-        })
+        // Notify client (only if there's a user to notify)
+        if (notifyUserId) {
+          await tx.notification.create({
+            data: {
+              userId: notifyUserId,
+              dossierId,
+              type: 'MANDATE_REJECTED',
+              title: 'Mandat rejeté',
+              message: `Votre mandat a été rejeté : ${message}. Veuillez le corriger.`,
+              link: `/dossier/${dossierId}/etape/MANDATE_SIGNATURE`,
+            },
+          })
+        }
 
         // Log activity
         await tx.activityLog.create({

@@ -21,6 +21,8 @@ import {
   Droplets,
   Wind,
   FileText,
+  Eye,
+  Download,
 } from 'lucide-react'
 
 interface Document {
@@ -28,6 +30,8 @@ interface Document {
   name: string
   workType: string
   status: string
+  url?: string
+  size?: number
 }
 
 interface InvoiceDepositFormProps {
@@ -58,6 +62,7 @@ export function InvoiceDepositForm({
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [isConfirmed, setIsConfirmed] = useState(false)
+  const [previewDocument, setPreviewDocument] = useState<Document | null>(null)
 
   // Group documents by work type
   const documentsByWork = documents.reduce((acc, doc) => {
@@ -176,6 +181,7 @@ export function InvoiceDepositForm({
           badge: <Badge variant="warning">En attente de vérification</Badge>,
           message: 'Vos factures sont en cours de vérification par notre équipe.',
           canEdit: false,
+          showForm: false,
         }
       case 'APPROVED':
         return {
@@ -183,13 +189,15 @@ export function InvoiceDepositForm({
           badge: <Badge variant="success">Validées</Badge>,
           message: 'Vos factures ont été validées. Votre dossier est complet !',
           canEdit: false,
+          showForm: false,
         }
       case 'REJECTED':
         return {
           icon: <AlertCircle className="h-5 w-5 text-red-500" />,
-          badge: <Badge variant="error">Rejetées</Badge>,
-          message: invoicesReviewMessage || 'Vos factures ont été rejetées. Veuillez les corriger.',
+          badge: <Badge variant="error">À corriger</Badge>,
+          message: invoicesReviewMessage || 'Vos factures ont été rejetées. Veuillez les corriger et redéposer.',
           canEdit: true,
+          showForm: true,
         }
       default:
         return {
@@ -197,6 +205,7 @@ export function InvoiceDepositForm({
           badge: <Badge variant="secondary">À déposer</Badge>,
           message: null,
           canEdit: true,
+          showForm: true,
         }
     }
   }
@@ -234,11 +243,16 @@ export function InvoiceDepositForm({
               invoicesStatus === 'APPROVED'
                 ? 'Factures validées'
                 : invoicesStatus === 'REJECTED'
-                ? 'Factures rejetées'
+                ? 'Correction requise'
                 : 'En cours de vérification'
             }
           >
             {statusDisplay.message}
+            {invoicesStatus === 'REJECTED' && (
+              <p className="mt-2 font-medium">
+                Supprimez les factures concernées et déposez les nouveaux documents ci-dessous.
+              </p>
+            )}
           </Alert>
         )}
 
@@ -305,13 +319,51 @@ export function InvoiceDepositForm({
                     {docs.map(doc => (
                       <div
                         key={doc.id}
-                        className="flex items-center justify-between p-2 bg-gray-50 rounded"
+                        className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100"
                       >
-                        <div className="flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-gray-400" />
-                          <span className="text-sm text-gray-700">{doc.name}</span>
+                        {/* Miniature cliquable */}
+                        {doc.url && (
+                          <button
+                            type="button"
+                            onClick={() => setPreviewDocument(doc)}
+                            className="relative flex-shrink-0 w-12 h-16 bg-white border border-gray-200 rounded-md overflow-hidden hover:border-primary-400 hover:shadow-md transition-all cursor-pointer group"
+                          >
+                            <iframe
+                              src={doc.url}
+                              className="w-full h-full pointer-events-none scale-100"
+                              title={`Aperçu de ${doc.name}`}
+                            />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                              <Eye className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" />
+                            </div>
+                          </button>
+                        )}
+                        {/* Informations du fichier */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <FileText className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                            <span className="text-sm font-medium text-gray-700 truncate">
+                              {doc.name}
+                            </span>
+                          </div>
+                          {doc.size && (
+                            <p className="text-xs text-gray-500 mt-0.5 ml-6">
+                              {(doc.size / 1024).toFixed(1)} Ko • PDF
+                            </p>
+                          )}
+                          {doc.url && (
+                            <button
+                              type="button"
+                              onClick={() => setPreviewDocument(doc)}
+                              className="text-xs text-primary-600 hover:text-primary-700 mt-1 ml-6 flex items-center gap-1"
+                            >
+                              <Eye className="h-3 w-3" />
+                              Voir l'aperçu
+                            </button>
+                          )}
                         </div>
-                        <div className="flex items-center gap-2">
+                        {/* Badge et actions */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
                           <Badge
                             variant={
                               doc.status === 'VALIDATED'
@@ -330,7 +382,7 @@ export function InvoiceDepositForm({
                           {statusDisplay.canEdit && (
                             <button
                               onClick={() => handleDeleteDocument(doc.id)}
-                              className="p-1 text-gray-400 hover:text-red-500"
+                              className="p-1 text-gray-400 hover:text-red-500 transition-colors"
                             >
                               <X className="h-4 w-4" />
                             </button>
@@ -413,6 +465,89 @@ export function InvoiceDepositForm({
           </Button>
         )}
       </CardContent>
+
+      {/* Modal d'aperçu du fichier */}
+      {previewDocument && previewDocument.url && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={() => setPreviewDocument(null)}
+        >
+          <div
+            className="relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-scale-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header de la modal */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-100 rounded-lg">
+                  <FileText className="h-5 w-5 text-green-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900 truncate max-w-md">
+                    {previewDocument.name}
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    {previewDocument.size
+                      ? `${(previewDocument.size / 1024).toFixed(1)} Ko • PDF`
+                      : 'PDF'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (previewDocument.url) {
+                      window.open(previewDocument.url, '_blank')
+                    }
+                  }}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Télécharger
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewDocument(null)}
+                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Contenu de l'aperçu */}
+            <div className="flex-1 overflow-hidden bg-gray-100 p-4">
+              <iframe
+                src={previewDocument.url}
+                className="w-full h-full min-h-[60vh] rounded-lg border border-gray-200 bg-white"
+                title="Aperçu du document"
+              />
+            </div>
+
+            {/* Footer de la modal */}
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50">
+              <Button
+                variant="outline"
+                onClick={() => setPreviewDocument(null)}
+              >
+                Fermer
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (previewDocument.url) {
+                    window.open(previewDocument.url, '_blank')
+                  }
+                }}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Télécharger le fichier
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </Card>
   )
 }

@@ -34,10 +34,11 @@ export default function LoginPage() {
       }
 
       // Redirect based on role
-      if (data.user.role === 'CLIENT') {
-        router.push('/dashboard')
-      } else {
+      if (data.user.role === 'ADMIN') {
         router.push('/admin')
+      } else {
+        // CLIENT and ARTISAN both go to /dashboard
+        router.push('/dashboard')
       }
       router.refresh()
     } catch {
@@ -119,6 +120,7 @@ export default function LoginPage() {
           </p>
           <div className="text-sm text-kopro-dark/70 space-y-1">
             <p>Client : client@exemple.fr / client123</p>
+            <p>Artisan : artisan@exemple.fr / artisan123</p>
             <p>Admin : admin@kopro.fr / admin123</p>
           </div>
         </div>

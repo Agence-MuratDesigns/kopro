@@ -32,17 +32,20 @@ export async function POST(request: NextRequest, context: Context) {
       },
     })
 
-    // Notify client
-    await prisma.notification.create({
-      data: {
-        userId: document.dossier.clientId,
-        dossierId: id,
-        type: 'DOCUMENT_VALIDATED',
-        title: 'Document validé',
-        message: `Votre document "${document.name}" a été validé.`,
-        link: `/dossier/${id}`,
-      },
-    })
+    // Notify client or artisan
+    const notifyUserId = document.dossier.clientId || document.dossier.artisanId
+    if (notifyUserId) {
+      await prisma.notification.create({
+        data: {
+          userId: notifyUserId,
+          dossierId: id,
+          type: 'DOCUMENT_VALIDATED',
+          title: 'Document validé',
+          message: `Le document "${document.name}" a été validé.`,
+          link: `/dossier/${id}`,
+        },
+      })
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {

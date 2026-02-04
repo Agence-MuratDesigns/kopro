@@ -99,7 +99,11 @@ export async function GET(request: NextRequest, context: Context) {
     const zipBuffer = Buffer.concat(chunks)
 
     // Filename for download
-    const clientName = `${dossier.client.firstName}_${dossier.client.lastName}`.replace(/\s+/g, '_')
+    const clientName = dossier.client
+      ? `${dossier.client.firstName}_${dossier.client.lastName}`.replace(/\s+/g, '_')
+      : dossier.endClientFirstName
+        ? `${dossier.endClientFirstName}_${dossier.endClientLastName || ''}`.replace(/\s+/g, '_')
+        : 'Client'
     const fileName = `Dossier_${dossier.reference}_${clientName}.zip`
 
     // Return ZIP file

@@ -15,6 +15,8 @@ import {
   Info,
   AlertTriangle,
   Lightbulb,
+  CreditCard,
+  Home,
 } from 'lucide-react'
 
 // ============================================
@@ -74,6 +76,60 @@ const guideSteps = [
   },
   {
     number: 3,
+    code: 'PROJECT_INFO',
+    title: 'Informations du projet',
+    shortTitle: 'Projet',
+    icon: Home,
+    color: 'teal',
+    actor: 'Client',
+    description: 'Renseignez les informations sur votre logement et votre projet de rénovation.',
+    details: [
+      'Indiquez le type de logement (maison ou appartement)',
+      'Renseignez la surface habitable et l\'année de construction',
+      'Précisez votre source d\'énergie principale actuelle',
+      'Indiquez votre catégorie de revenus et la composition du foyer',
+    ],
+    whatToDo: 'Complétez le formulaire avec les informations sur votre logement et votre projet, puis soumettez pour validation.',
+    tips: [
+      'Ayez votre dernier avis d\'imposition à portée de main',
+      'La surface doit correspondre à la surface habitable déclarée',
+      'Les informations doivent correspondre à votre dossier MaPrimeRénov\'',
+    ],
+    warnings: [
+      'Des informations incorrectes peuvent affecter le montant de vos aides',
+      'Attendez la validation admin avant de passer à l\'étape suivante',
+    ],
+    duration: '24-48h pour la validation',
+  },
+  {
+    number: 4,
+    code: 'PAYMENT',
+    title: 'Paiement des frais de dossier',
+    shortTitle: 'Paiement',
+    icon: CreditCard,
+    color: 'emerald',
+    actor: 'Client',
+    description: 'Réglez les frais d\'accompagnement KOPRO (290 €) pour continuer votre parcours.',
+    details: [
+      'Montant fixe de 290 € pour l\'accompagnement complet',
+      'Paiement sécurisé par carte bancaire via Stripe',
+      'Validation automatique une fois le paiement confirmé',
+      'Accès immédiat à l\'étape suivante après paiement',
+    ],
+    whatToDo: 'Cliquez sur le bouton de paiement, vous serez redirigé vers la page sécurisée Stripe pour régler les 290 € de frais d\'accompagnement.',
+    tips: [
+      'Le paiement est sécurisé et crypté (SSL)',
+      'Vos informations bancaires ne sont pas stockées sur nos serveurs',
+      'Une confirmation vous sera envoyée par email',
+    ],
+    warnings: [
+      'Le paiement est obligatoire pour continuer votre dossier',
+      'En cas d\'échec, vous pouvez réessayer à tout moment',
+    ],
+    duration: 'Immédiat',
+  },
+  {
+    number: 5,
     code: 'MANDATE_SIGNATURE',
     title: 'Signature du mandat',
     shortTitle: 'Mandat',
@@ -100,7 +156,7 @@ const guideSteps = [
     duration: 'Immédiat (électronique) ou 24-48h (manuscrit)',
   },
   {
-    number: 4,
+    number: 6,
     code: 'WORK_SELECTION',
     title: 'Sélection des travaux',
     shortTitle: 'Travaux',
@@ -128,7 +184,7 @@ const guideSteps = [
     duration: 'Validation automatique',
   },
   {
-    number: 5,
+    number: 7,
     code: 'QUOTE_DEPOSIT',
     title: 'Dépôt des devis',
     shortTitle: 'Devis',
@@ -155,34 +211,34 @@ const guideSteps = [
     duration: '2-5 jours pour la vérification',
   },
   {
-    number: 6,
+    number: 8,
     code: 'WORK_AUTHORIZATION',
-    title: 'Autorisation des travaux',
-    shortTitle: 'Autorisation',
+    title: 'Démarrage des travaux',
+    shortTitle: 'Démarrage',
     icon: PlayCircle,
     color: 'green',
     actor: 'Client',
-    description: 'Une fois les devis validés, vous pouvez démarrer vos travaux.',
+    description: 'Une fois les devis validés, vous pouvez démarrer vos travaux et nous le signaler.',
     details: [
       'Vous recevez la confirmation que vos devis sont conformes',
-      'Vous êtes autorisé à démarrer les travaux avec vos artisans',
+      'Vous pouvez démarrer les travaux avec vos artisans',
       'Cliquez sur "Notifier le début des travaux" quand ils commencent',
       'Conservez tous les documents pendant la durée des travaux',
     ],
-    whatToDo: 'Attendez la validation de vos devis, puis cliquez sur le bouton pour signaler le début des travaux.',
+    whatToDo: 'Après validation de vos devis, démarrez les travaux puis cliquez sur le bouton pour nous signaler leur début.',
     tips: [
       'Conservez précieusement toutes les factures',
       'Prenez des photos avant/après si possible',
       'Gardez contact avec votre conseiller pendant les travaux',
     ],
     warnings: [
-      'Ne commencez les travaux qu\'après avoir reçu l\'autorisation',
+      'Ne commencez les travaux qu\'après validation de vos devis',
       'Tout travail anticipé peut compromettre vos aides',
     ],
     duration: 'Variable selon vos travaux',
   },
   {
-    number: 7,
+    number: 9,
     code: 'INVOICE_DEPOSIT',
     title: 'Dépôt des factures',
     shortTitle: 'Factures',
@@ -209,12 +265,12 @@ const guideSteps = [
     duration: '2-5 jours pour la vérification',
   },
   {
-    number: 8,
+    number: 10,
     code: 'FINAL_RECAP',
     title: 'Récapitulatif final',
     shortTitle: 'Clôture',
     icon: CheckCircle2,
-    color: 'emerald',
+    color: 'sky',
     actor: 'Admin',
     description: 'Votre dossier est clôturé. Consultez le récapitulatif et attendez le versement.',
     details: [
@@ -306,7 +362,7 @@ export function InteractiveGuide() {
             <div>
               <div className="flex items-center gap-2">
                 <span className={cn('text-sm font-medium', primaryColor.text)}>
-                  Étape {selectedStep.number}/8
+                  Étape {selectedStep.number}/10
                 </span>
                 <span className="text-xs px-2 py-0.5 bg-white rounded-full text-gray-600">
                   {selectedStep.actor === 'Client' ? 'Action client' : 'Action admin'}
@@ -411,10 +467,10 @@ export function InteractiveGuide() {
             const nextIndex = selectedStep.number
             if (nextIndex < guideSteps.length) setSelectedStep(guideSteps[nextIndex])
           }}
-          disabled={selectedStep.number === 8}
+          disabled={selectedStep.number === 10}
           className={cn(
             'px-4 py-2 text-sm rounded-lg transition-colors',
-            selectedStep.number === 8
+            selectedStep.number === 10
               ? 'text-gray-300 cursor-not-allowed'
               : 'text-gray-600 hover:bg-gray-100'
           )}

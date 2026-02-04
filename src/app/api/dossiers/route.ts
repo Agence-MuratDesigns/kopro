@@ -11,8 +11,13 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
 
+    // Support both array (projectTypes) and single value (projectType) for backward compatibility
+    const projectType = body.projectTypes && Array.isArray(body.projectTypes)
+      ? JSON.stringify(body.projectTypes)
+      : body.projectType
+
     const dossier = await createDossier(session.userId, {
-      projectType: body.projectType,
+      projectType,
       projectAddress: body.projectAddress,
       projectCity: body.projectCity,
       projectPostalCode: body.projectPostalCode,

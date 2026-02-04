@@ -28,8 +28,15 @@ export async function POST(request: NextRequest, context: Context) {
       },
     })
 
-    if (!dossier || dossier.clientId !== session.userId) {
+    if (!dossier) {
       return NextResponse.json({ error: 'Dossier non trouvé' }, { status: 404 })
+    }
+
+    // Check access: client owns the dossier OR artisan manages it
+    const isOwner = dossier.clientId === session.userId
+    const isArtisanManager = dossier.artisanId === session.userId
+    if (!isOwner && !isArtisanManager) {
+      return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 })
     }
 
     // Check if quotes step is accessible
@@ -107,7 +114,11 @@ export async function POST(request: NextRequest, context: Context) {
         where: { role: { in: ['ADMIN'] } },
       })
 
-      const clientName = `${dossier.client.firstName} ${dossier.client.lastName}`
+      const clientName = dossier.client
+        ? `${dossier.client.firstName} ${dossier.client.lastName}`
+        : dossier.endClientFirstName
+          ? `${dossier.endClientFirstName} ${dossier.endClientLastName || ''}`
+          : 'Client'
 
       for (const admin of admins) {
         await tx.notification.create({
@@ -134,11 +145,15 @@ export async function POST(request: NextRequest, context: Context) {
     })
 
     // Notify admins in real-time
-    const clientName = `${dossier.client.firstName} ${dossier.client.lastName}`
+    const clientNameRealtime = dossier.client
+      ? `${dossier.client.firstName} ${dossier.client.lastName}`
+      : dossier.endClientFirstName
+        ? `${dossier.endClientFirstName} ${dossier.endClientLastName || ''}`
+        : 'Client'
     notifyAdminsOfClientAction('quotes_submitted', {
       dossierId: id,
-      clientName,
-      message: `Devis déposés par ${clientName}`,
+      clientName: clientNameRealtime,
+      message: `Devis déposés par ${clientNameRealtime}`,
     })
 
     return NextResponse.json({

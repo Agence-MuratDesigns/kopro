@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Alert } from '@/components/ui/alert'
@@ -16,8 +16,11 @@ import {
   PenTool,
   FileText,
   Info,
-  FastForward,
+  Eye,
+  X,
+  MessageCircle,
 } from 'lucide-react'
+import { useChat } from '@/contexts/chat-context'
 
 interface MandateSignatureFormProps {
   dossierId: string
@@ -31,37 +34,39 @@ export function MandateSignatureForm({
   mandatReviewMessage,
 }: MandateSignatureFormProps) {
   const router = useRouter()
+  const { openChat } = useChat()
   const [isUploading, setIsUploading] = useState(false)
-  const [isSkipping, setIsSkipping] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null)
+  const [showPreviewModal, setShowPreviewModal] = useState(false)
 
-  // DEV: Skip step function
-  const handleSkipStep = async () => {
-    setIsSkipping(true)
-    setError('')
+  // Ouvrir le chat avec message pré-rempli pour contacter le support
+  const handleContactSupport = () => {
+    const message = "Bonjour, je souhaite modifier mon mandat administratif (étape 4). Pouvez-vous m'aider ?"
+    openChat(dossierId, message)
+  }
 
-    try {
-      const response = await fetch(`/api/dossiers/${dossierId}/skip-step`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stepCode: 'MANDATE_SIGNATURE' }),
-      })
+  // Créer l'URL de prévisualisation quand un fichier est sélectionné
+  useEffect(() => {
+    if (selectedFile) {
+      const url = URL.createObjectURL(selectedFile)
+      setFilePreviewUrl(url)
+      return () => URL.revokeObjectURL(url)
+    } else {
+      setFilePreviewUrl(null)
+    }
+  }, [selectedFile])
 
-      const data = await response.json()
-
-      if (!response.ok) {
-        setError(data.error || 'Erreur lors du passage de l\'étape')
-        return
-      }
-
-      setSuccess('Étape passée avec succès (mode développement)')
-      router.refresh()
-    } catch {
-      setError('Erreur de connexion au serveur')
-    } finally {
-      setIsSkipping(false)
+  const handleDownloadSelectedFile = () => {
+    if (selectedFile && filePreviewUrl) {
+      const link = document.createElement('a')
+      link.href = filePreviewUrl
+      link.download = selectedFile.name
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
     }
   }
 
@@ -194,6 +199,32 @@ export function MandateSignatureForm({
           </Alert>
         )}
 
+        {/* Message pour contacter le support après validation */}
+        {mandatStatus === 'APPROVED' && (
+          <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="flex items-start gap-3">
+              <Info className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm text-amber-800 font-medium mb-2">
+                  Cette étape a été validée
+                </p>
+                <p className="text-sm text-amber-700 mb-3">
+                  Pour toute modification, veuillez contacter notre équipe.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleContactSupport}
+                  className="border-amber-300 text-amber-700 hover:bg-amber-100"
+                >
+                  <MessageCircle className="h-4 w-4 mr-2" />
+                  Contacter le support
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Information */}
         <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg">
           <div className="flex items-start gap-3">
@@ -269,10 +300,43 @@ export function MandateSignatureForm({
                     onChange={handleFileChange}
                     className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
                   />
-                  {selectedFile && (
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <FileText className="h-4 w-4" />
-                      {selectedFile.name}
+                  {selectedFile && filePreviewUrl && (
+                    <div className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg">
+                      {/* Miniature cliquable */}
+                      <button
+                        type="button"
+                        onClick={() => setShowPreviewModal(true)}
+                        className="relative flex-shrink-0 w-16 h-20 bg-gray-100 border border-gray-200 rounded-md overflow-hidden hover:border-primary-400 hover:shadow-md transition-all cursor-pointer group"
+                      >
+                        <iframe
+                          src={filePreviewUrl}
+                          className="w-full h-full pointer-events-none"
+                          title="Aperçu du fichier"
+                        />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                          <Eye className="h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" />
+                        </div>
+                      </button>
+                      {/* Informations du fichier */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                          <span className="text-sm font-medium text-gray-700 truncate">
+                            {selectedFile.name}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {(selectedFile.size / 1024).toFixed(1)} Ko • PDF
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setShowPreviewModal(true)}
+                          className="text-xs text-primary-600 hover:text-primary-700 mt-1 flex items-center gap-1"
+                        >
+                          <Eye className="h-3 w-3" />
+                          Voir l'aperçu
+                        </button>
+                      </div>
                     </div>
                   )}
                   <Button
@@ -298,39 +362,80 @@ export function MandateSignatureForm({
           </>
         )}
 
-        {/* DEV: Skip button for testing */}
-        {process.env.NODE_ENV !== 'production' && statusDisplay.canEdit && (
-          <div className="pt-4 border-t border-dashed border-gray-200">
-            <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <FastForward className="h-4 w-4 text-amber-600" />
-                <span className="text-sm font-medium text-amber-800">Mode développement</span>
+      </CardContent>
+
+      {/* Modal d'aperçu du fichier */}
+      {showPreviewModal && filePreviewUrl && selectedFile && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={() => setShowPreviewModal(false)}
+        >
+          <div
+            className="relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-scale-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header de la modal */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary-100 rounded-lg">
+                  <FileText className="h-5 w-5 text-primary-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900 truncate max-w-md">
+                    {selectedFile.name}
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    {(selectedFile.size / 1024).toFixed(1)} Ko • PDF
+                  </p>
+                </div>
               </div>
-              <p className="text-sm text-amber-700 mb-3">
-                Passer cette étape sans compléter le mandat (uniquement en développement)
-              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDownloadSelectedFile}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Télécharger
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => setShowPreviewModal(false)}
+                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Contenu de l'aperçu */}
+            <div className="flex-1 overflow-hidden bg-gray-100 p-4">
+              <iframe
+                src={filePreviewUrl}
+                className="w-full h-full min-h-[60vh] rounded-lg border border-gray-200 bg-white"
+                title="Aperçu du document"
+              />
+            </div>
+
+            {/* Footer de la modal */}
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50">
               <Button
                 variant="outline"
-                onClick={handleSkipStep}
-                disabled={isSkipping}
-                className="w-full border-amber-300 text-amber-700 hover:bg-amber-100"
+                onClick={() => setShowPreviewModal(false)}
               >
-                {isSkipping ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Passage en cours...
-                  </>
-                ) : (
-                  <>
-                    <FastForward className="h-4 w-4 mr-2" />
-                    Passer à l'étape suivante
-                  </>
-                )}
+                Fermer
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleDownloadSelectedFile}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Télécharger le fichier
               </Button>
             </div>
           </div>
-        )}
-      </CardContent>
+        </div>
+      )}
     </Card>
   )
 }

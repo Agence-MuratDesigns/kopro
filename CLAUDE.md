@@ -516,11 +516,11 @@ Exemple :
 
 ---
 
-# ÉTAPE 06 — Autorisation de démarrage des travaux
+# ÉTAPE 06 — Démarrage des travaux
 
 **Code**: `WORK_AUTHORIZATION`
-**Acteur**: Admin autorise, Client notifie démarrage
-**Catégorie**: `ADMIN_ACTION` puis `CLIENT_ACTION`
+**Acteur**: Client déclare le début des travaux
+**Catégorie**: `CLIENT_ACTION`
 
 ## 1. Déclenchement
 
@@ -535,7 +535,7 @@ L'étape 6 devient accessible lorsque :
 ### Message client (e-mail + interface)
 
 - Confirmation que les devis sont conformes
-- Autorisation officielle de démarrer les travaux
+- Information que le client peut démarrer les travaux
 - Rappel : "Vous pouvez désormais démarrer les travaux avec les entreprises sélectionnées."
 
 ## 3. Écran client

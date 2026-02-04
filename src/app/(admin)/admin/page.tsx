@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { formatDate, formatCurrency, stepStatusLabels } from '@/lib/utils'
+import { RecentDossiers } from '@/components/admin/recent-dossiers'
+import { PaymentRevenueCard } from '@/components/admin/payment-revenue-card'
 import Link from 'next/link'
 import {
   FileText,
@@ -18,6 +20,8 @@ import {
   Euro,
   UserPlus,
   Key,
+  ClipboardCheck,
+  Building2,
 } from 'lucide-react'
 
 export default async function AdminDashboardPage() {
@@ -30,29 +34,55 @@ export default async function AdminDashboardPage() {
     dossiersTermines,
     dossiersEnAttente,
     totalClients,
+    totalArtisans,
     unreadMessages,
     pendingValidations,
     recentDossiers,
+    paymentStats,
+    pendingPaymentsCount,
+    recentPayments,
   ] = await Promise.all([
     prisma.dossier.count(),
     prisma.dossier.count({ where: { status: 'EN_COURS' } }),
     prisma.dossier.count({ where: { status: 'TERMINE' } }),
     prisma.dossier.count({ where: { status: 'EN_ATTENTE' } }),
     prisma.user.count({ where: { role: 'CLIENT' } }),
+    prisma.user.count({ where: { role: 'ARTISAN' } }),
     prisma.message.count({ where: { isRead: false, messageType: 'CLIENT' } }),
     prisma.dossierStep.count({ where: { status: 'PENDING_VALIDATION' } }),
     prisma.dossier.findMany({
-      take: 5,
-      orderBy: { updatedAt: 'desc' },
+      take: 10,
+      orderBy: { createdAt: 'desc' },
       include: {
         client: {
           select: { firstName: true, lastName: true },
+        },
+        artisan: {
+          select: { firstName: true, lastName: true, companyName: true },
         },
         steps: {
           include: { template: true },
           orderBy: { template: { order: 'asc' } },
         },
       },
+    }),
+    prisma.payment.aggregate({
+      where: { status: 'SUCCEEDED' },
+      _sum: { amount: true },
+      _count: true,
+    }),
+    prisma.payment.count({
+      where: { status: { in: ['PENDING', 'PROCESSING'] } },
+    }),
+    prisma.payment.findMany({
+      where: { status: 'SUCCEEDED' },
+      select: {
+        amount: true,
+        paidAt: true,
+        dossier: { select: { reference: true } },
+      },
+      orderBy: { paidAt: 'desc' },
+      take: 10,
     }),
   ])
 
@@ -66,10 +96,48 @@ export default async function AdminDashboardPage() {
 
   const totalAides = (amountsResult._sum.mprAmount || 0) + (amountsResult._sum.ceeAmount || 0)
 
-  // Get pending MPR validations
-  const pendingMprValidations = await prisma.dossier.count({
-    where: { mprStatus: 'PENDING_REVIEW' },
+  // Get all dossiers with pending validations (steps with PENDING_VALIDATION status)
+  const dossiersWithPendingSteps = await prisma.dossier.findMany({
+    where: {
+      steps: {
+        some: {
+          status: 'PENDING_VALIDATION'
+        }
+      }
+    },
+    select: {
+      id: true,
+      reference: true,
+      endClientFirstName: true,
+      endClientLastName: true,
+      client: {
+        select: { firstName: true, lastName: true }
+      },
+      steps: {
+        where: { status: 'PENDING_VALIDATION' },
+        include: { template: true }
+      }
+    }
   })
+
+  // Count total pending validations by step type
+  const pendingByStepType: Record<string, { count: number; dossiers: typeof dossiersWithPendingSteps }> = {}
+
+  dossiersWithPendingSteps.forEach(dossier => {
+    dossier.steps.forEach(step => {
+      const stepName = step.template.name
+      if (!pendingByStepType[stepName]) {
+        pendingByStepType[stepName] = { count: 0, dossiers: [] }
+      }
+      pendingByStepType[stepName].count++
+      if (!pendingByStepType[stepName].dossiers.find(d => d.id === dossier.id)) {
+        pendingByStepType[stepName].dossiers.push(dossier)
+      }
+    })
+  })
+
+  const totalPendingDossiers = dossiersWithPendingSteps.length
+  const singlePendingDossier = totalPendingDossiers === 1 ? dossiersWithPendingSteps[0] : null
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -83,35 +151,80 @@ export default async function AdminDashboardPage() {
             Vue d'ensemble de l'activité KOPRO
           </p>
         </div>
-        <Link href="/admin/clients/new">
-          <Button>
-            <UserPlus className="h-4 w-4 mr-2" />
-            Ajouter un client
-          </Button>
-        </Link>
-      </div>
-
-      {/* Pending MPR Alert */}
-      {pendingMprValidations > 0 && (
-        <div className="p-4 bg-[var(--accent-2)]/10 border border-[var(--accent-2)]/30 rounded-2xl flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-[var(--accent-2)]/20 rounded-xl">
-              <Key className="h-5 w-5 text-[var(--accent-2)]" />
-            </div>
-            <div>
-              <p className="font-medium text-[var(--dark)]">
-                {pendingMprValidations} identifiant{pendingMprValidations > 1 ? 's' : ''} MaPrimeRénov' à valider
-              </p>
-              <p className="text-sm text-[var(--grey)]">
-                Des clients attendent la validation de leur identifiant
-              </p>
-            </div>
-          </div>
-          <Link href="/admin/dossiers?filter=mpr_pending">
-            <Button variant="secondary" size="sm">
-              Voir les dossiers
+        <div className="flex gap-3">
+          <Link href="/admin/artisans/new">
+            <Button variant="outline">
+              <Building2 className="h-4 w-4 mr-2" />
+              Ajouter un artisan
             </Button>
           </Link>
+          <Link href="/admin/clients/new">
+            <Button>
+              <UserPlus className="h-4 w-4 mr-2" />
+              Ajouter un client
+            </Button>
+          </Link>
+        </div>
+      </div>
+
+      {/* Pending Validations Alert */}
+      {totalPendingDossiers > 0 && (
+        <div
+          className="rounded-2xl bg-accent text-white"
+          style={{
+            boxShadow: 'rgba(250, 251, 253, 0.68) 0px 0px 1em -0.3em inset, rgba(78, 27, 81, 0.07) 0px 1.7px 6.9px 0px, rgba(78, 27, 81, 0.082) 0px 3.8px 14.1px 0px, rgba(78, 27, 81, 0.086) 0px 7.1px 22.1px 0px, rgba(78, 27, 81, 0.094) 0px 15px 33.1px 0px'
+          }}
+        >
+          <div className="py-6 px-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-white/20 rounded-xl">
+                  <ClipboardCheck className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm text-white/80 mb-1">Action requise</p>
+                  <h3 className="text-xl font-bold text-white">
+                    {singlePendingDossier
+                      ? `1 dossier à valider`
+                      : `${totalPendingDossiers} dossiers à valider`
+                    }
+                  </h3>
+                  {singlePendingDossier ? (
+                    <p className="text-white/90 mt-1">
+                      {singlePendingDossier.client
+                        ? `${singlePendingDossier.client.firstName} ${singlePendingDossier.client.lastName}`
+                        : singlePendingDossier.endClientFirstName
+                          ? `${singlePendingDossier.endClientFirstName} ${singlePendingDossier.endClientLastName || ''}`
+                          : 'Client'
+                      } - {singlePendingDossier.reference}
+                      <span className="block text-white/70 text-sm mt-0.5">
+                        Étape : {singlePendingDossier.steps[0]?.template.name}
+                      </span>
+                    </p>
+                  ) : (
+                    <div className="text-white/90 mt-2 space-y-1">
+                      {Object.entries(pendingByStepType).map(([stepName, data]) => (
+                        <p key={stepName} className="text-sm flex items-center gap-2">
+                          <span className="bg-white/20 px-2 py-0.5 rounded-full text-xs font-medium">
+                            {data.count}
+                          </span>
+                          {stepName}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <Link href={singlePendingDossier
+                ? `/admin/dossiers/${singlePendingDossier.id}`
+                : '/admin/dossiers'
+              }>
+                <Button className="btn-primary text-lg py-3 px-8 bg-white text-accent hover:bg-gray-100 hover:text-kopro-dark">
+                  {singlePendingDossier ? 'Valider maintenant' : 'Voir les dossiers'}
+                </Button>
+              </Link>
+            </div>
+          </div>
         </div>
       )}
 
@@ -140,6 +253,20 @@ export default async function AdminDashboardPage() {
             </div>
           </CardContent>
         </Card>
+
+        <Link href="/admin/artisans">
+          <Card className="cursor-pointer hover:shadow-md transition-shadow">
+            <CardContent className="flex items-center gap-4 p-6">
+              <div className="p-3 bg-[var(--accent)]/10 rounded-xl">
+                <Building2 className="h-6 w-6 text-[var(--accent)]" />
+              </div>
+              <div>
+                <p className="text-sm text-[var(--grey)]">Artisans</p>
+                <p className="text-2xl font-bold text-[var(--dark)]">{totalArtisans}</p>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
 
         <Link href="/admin/messages">
           <Card className="cursor-pointer">
@@ -248,105 +375,53 @@ export default async function AdminDashboardPage() {
         </Card>
       </div>
 
+      {/* Payment Revenue Section */}
+      <div className="grid lg:grid-cols-3 gap-6">
+        <PaymentRevenueCard
+          totalRevenue={paymentStats._sum.amount || 0}
+          totalPayments={paymentStats._count || 0}
+          pendingPayments={pendingPaymentsCount}
+          recentPayments={recentPayments}
+        />
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-[var(--accent)]" />
+              Taux de conversion
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div>
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-[var(--grey)]">Paiements réussis</span>
+                  <span className="font-medium text-[var(--dark)]">
+                    {totalDossiers > 0
+                      ? Math.round(((paymentStats._count || 0) / totalDossiers) * 100)
+                      : 0}%
+                  </span>
+                </div>
+                <Progress
+                  value={totalDossiers > 0
+                    ? ((paymentStats._count || 0) / totalDossiers) * 100
+                    : 0}
+                  className="h-2"
+                />
+              </div>
+              <div className="pt-2 border-t text-center">
+                <p className="text-2xl font-bold text-[var(--accent)]">
+                  {paymentStats._count || 0} / {totalDossiers}
+                </p>
+                <p className="text-sm text-[var(--grey)]">dossiers payés</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Recent Dossiers */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Dossiers récents</CardTitle>
-          <Link
-            href="/admin/dossiers"
-            className="text-sm text-[var(--accent)] hover:text-[var(--dark)] transition-colors"
-          >
-            Voir tous
-          </Link>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {recentDossiers.map(dossier => {
-              const currentStep = dossier.steps.find(
-                s =>
-                  s.status === 'IN_PROGRESS' ||
-                  s.status === 'PENDING_VALIDATION' ||
-                  s.status === 'AVAILABLE'
-              )
-              const progress = Math.round(
-                (dossier.steps.filter(s => s.status === 'VALIDATED').length /
-                  dossier.steps.length) *
-                  100
-              )
-
-              const isClosed = dossier.status === 'CLOTURE' || dossier.status === 'TERMINE'
-
-              return (
-                <Link
-                  key={dossier.id}
-                  href={`/admin/dossiers/${dossier.id}`}
-                  className="block"
-                >
-                  <div className={`flex items-center justify-between p-4 rounded-xl transition-all duration-200 ${
-                    isClosed
-                      ? 'bg-[var(--success)]/5 hover:bg-[var(--success)]/10 border border-[var(--success)]/20'
-                      : 'bg-[var(--light-purple)]/30 hover:bg-[var(--light-purple)]/50'
-                  }`}>
-                    <div className="flex items-center gap-4">
-                      {isClosed && (
-                        <div className="p-2 bg-[var(--success)]/10 rounded-full">
-                          <CheckCircle className="h-5 w-5 text-[var(--success)]" />
-                        </div>
-                      )}
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className={`font-medium ${isClosed ? 'text-[var(--success)]' : 'text-[var(--dark)]'}`}>
-                            {dossier.reference}
-                          </p>
-                          <Badge
-                            variant="success"
-                            className={
-                              isClosed
-                                ? 'bg-[var(--success)] text-white'
-                                : dossier.status === 'EN_ATTENTE'
-                                ? 'bg-[var(--accent-2)]/20 text-[var(--accent-2)]'
-                                : 'bg-[var(--light-purple)] text-[var(--accent)]'
-                            }
-                          >
-                            {isClosed ? 'Clôturé' : dossier.status.replace('_', ' ')}
-                          </Badge>
-                        </div>
-                        <p className={`text-sm ${isClosed ? 'text-[var(--success)]' : 'text-[var(--grey)]'}`}>
-                          {dossier.client.firstName} {dossier.client.lastName}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-6">
-                      {currentStep && !isClosed && (
-                        <div className="text-right">
-                          <p className="text-xs text-[var(--grey)]">Étape en cours</p>
-                          <p className="text-sm font-medium text-[var(--dark)]">
-                            {currentStep.template.name}
-                          </p>
-                        </div>
-                      )}
-                      {isClosed && (
-                        <div className="text-right">
-                          <p className="text-xs text-[var(--success)]">Dossier terminé</p>
-                          <p className="text-sm font-medium text-[var(--success)]">
-                            100% complété
-                          </p>
-                        </div>
-                      )}
-                      <div className="w-24">
-                        <Progress value={progress} className={`h-2 ${isClosed ? '[&>div]:bg-[var(--success)]' : ''}`} />
-                        <p className={`text-xs text-center mt-1 ${isClosed ? 'text-[var(--success)]' : 'text-[var(--grey)]'}`}>
-                          {progress}%
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-              )
-            })}
-          </div>
-        </CardContent>
-      </Card>
+      <RecentDossiers dossiers={recentDossiers} />
     </div>
   )
 }

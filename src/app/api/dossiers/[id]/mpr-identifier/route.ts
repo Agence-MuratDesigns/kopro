@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth'
-import { notifyAdminsOfClientAction } from '@/lib/realtime'
+import { sendEventToUser } from '@/lib/realtime'
 
 interface RouteParams {
   params: Promise<{ id: string }>
 }
 
-// POST - Submit MPR identifier
+// POST - Submit MPR identifier (AUTO-VALIDATION - pas de validation admin)
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const { id: dossierId } = await params
@@ -30,9 +30,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Dossier non trouvé' }, { status: 404 })
     }
 
-    if (dossier.clientId !== user.id) {
+    // Check ownership (client or artisan)
+    const isOwner = dossier.clientId === user.id || dossier.artisanId === user.id
+    if (!isOwner) {
       return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 })
     }
+
+    // Determine actor type for history
+    const actorType = dossier.artisanId === user.id ? 'ARTISAN' : 'CLIENT'
 
     // Validate MPR ID format
     const mprIdRegex = /^MPR-\d{4}[A-Z]{2}$/
@@ -63,28 +68,41 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const previousValue = dossier.mprId
     const action = previousValue ? 'MODIFIED' : 'SUBMITTED'
 
-    // Update dossier with MPR ID
+    // Find the next step (PROJECT_INFO)
+    const nextStep = dossier.steps.find(s => s.template.code === 'PROJECT_INFO')
+
+    // AUTO-VALIDATION: Valider directement l'étape et débloquer la suivante
     await prisma.$transaction(async (tx) => {
-      // Update dossier
+      // Update dossier - directement APPROVED (auto-validation)
       await tx.dossier.update({
         where: { id: dossierId },
         data: {
           mprId,
-          mprStatus: 'PENDING_REVIEW',
+          mprStatus: 'APPROVED', // Auto-validation
           mprSubmittedAt: new Date(),
           mprLastUpdatedAt: new Date(),
+          mprReviewedAt: new Date(), // Validé automatiquement
           mprReviewMessage: null,
         },
       })
 
-      // Update step status
+      // Valider l'étape MPR directement
       await tx.dossierStep.update({
         where: { id: mprStep.id },
         data: {
-          status: 'PENDING_VALIDATION',
+          status: 'VALIDATED',
           startedAt: mprStep.startedAt || new Date(),
+          validatedAt: new Date(),
         },
       })
+
+      // Débloquer l'étape suivante (PROJECT_INFO)
+      if (nextStep) {
+        await tx.dossierStep.update({
+          where: { id: nextStep.id },
+          data: { status: 'AVAILABLE' },
+        })
+      }
 
       // Log in MPR history
       await tx.mprHistory.create({
@@ -94,24 +112,33 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           newValue: mprId,
           action,
           actorId: user.id,
-          actorType: 'CLIENT',
+          actorType,
         },
       })
 
-      // Create notification for admins
-      const admins = await tx.user.findMany({
-        where: { role: { in: ['ADMIN'] } },
+      // Auto-validation entry in history
+      await tx.mprHistory.create({
+        data: {
+          dossierId,
+          previousValue: mprId,
+          newValue: mprId,
+          action: 'APPROVED',
+          actorId: null, // Système
+          actorType: 'SYSTEM',
+          message: 'Validation automatique (format vérifié)',
+        },
       })
 
-      for (const admin of admins) {
+      // Notification client : étape suivante disponible
+      if (nextStep) {
         await tx.notification.create({
           data: {
-            userId: admin.id,
+            userId: user.id,
             dossierId,
-            type: 'MPR_SUBMITTED',
-            title: 'Nouvel identifiant MPR à valider',
-            message: `Le client ${user.firstName} ${user.lastName} a soumis son identifiant MaPrimeRénov' : ${mprId}`,
-            link: `/admin/dossiers/${dossierId}`,
+            type: 'STEP_AVAILABLE',
+            title: 'Identifiant enregistré',
+            message: `Votre identifiant MaPrimeRénov' a été enregistré. Vous pouvez maintenant compléter les informations de votre projet.`,
+            link: `/dossier/${dossierId}/etape/PROJECT_INFO`,
           },
         })
       }
@@ -121,22 +148,25 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         data: {
           userId: user.id,
           dossierId,
-          action: 'MPR_ID_SUBMITTED',
-          details: `Identifiant MPR soumis : ${mprId}`,
+          action: 'MPR_ID_VALIDATED',
+          details: `Identifiant MPR enregistré et validé automatiquement : ${mprId}`,
         },
       })
     })
 
-    // Notify admins in real-time
-    notifyAdminsOfClientAction('mpr_submitted', {
+    // Notify client in real-time
+    sendEventToUser(user.id, 'step_update', {
       dossierId,
-      clientName: `${user.firstName} ${user.lastName}`,
-      message: `Nouvel identifiant MPR soumis : ${mprId}`,
+      stepCode: 'MPR_IDENTIFIER',
+      status: 'VALIDATED',
+      action: 'auto_validated',
+      nextStepCode: 'PROJECT_INFO',
     })
 
     return NextResponse.json({
       success: true,
-      message: 'Identifiant soumis avec succès',
+      message: 'Identifiant enregistré avec succès. Passez à l\'étape suivante.',
+      autoValidated: true,
     })
   } catch (error) {
     console.error('Error submitting MPR ID:', error)
@@ -157,6 +187,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       where: { id: dossierId },
       select: {
         clientId: true,
+        artisanId: true,
         mprId: true,
         mprStatus: true,
         mprSubmittedAt: true,
@@ -169,7 +200,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Dossier non trouvé' }, { status: 404 })
     }
 
-    if (dossier.clientId !== user.id) {
+    // Check ownership (client or artisan)
+    const isOwner = dossier.clientId === user.id || dossier.artisanId === user.id
+    if (!isOwner) {
       return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 })
     }
 

@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Alert } from '@/components/ui/alert'
@@ -10,10 +9,11 @@ import {
   Loader2,
   CheckCircle,
   XCircle,
-  Clock,
   Key,
   ExternalLink,
   History,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 
 interface MprHistory {
@@ -48,6 +48,7 @@ export function AdminMprValidation({
   const [rejectMessage, setRejectMessage] = useState('')
   const [showRejectForm, setShowRejectForm] = useState(false)
   const [error, setError] = useState('')
+  const [isExpanded, setIsExpanded] = useState(false)
 
   const handleApprove = async () => {
     setError('')
@@ -63,11 +64,15 @@ export function AdminMprValidation({
       const data = await response.json()
 
       if (!response.ok) {
+        if (data.error?.includes('pas en attente')) {
+          window.location.reload()
+          return
+        }
         setError(data.error || 'Erreur lors de la validation')
         return
       }
 
-      router.refresh()
+      window.location.reload()
     } catch {
       setError('Erreur de connexion au serveur')
     } finally {
@@ -94,13 +99,15 @@ export function AdminMprValidation({
       const data = await response.json()
 
       if (!response.ok) {
+        if (data.error?.includes('pas en attente')) {
+          window.location.reload()
+          return
+        }
         setError(data.error || 'Erreur lors du rejet')
         return
       }
 
-      setShowRejectForm(false)
-      setRejectMessage('')
-      router.refresh()
+      window.location.reload()
     } catch {
       setError('Erreur de connexion au serveur')
     } finally {
@@ -111,7 +118,7 @@ export function AdminMprValidation({
   const getStatusBadge = () => {
     switch (mprStatus) {
       case 'PENDING_REVIEW':
-        return <Badge variant="warning">En attente de validation</Badge>
+        return <Badge variant="warning">En attente</Badge>
       case 'APPROVED':
         return <Badge variant="success">Validé</Badge>
       case 'REJECTED':
@@ -149,53 +156,71 @@ export function AdminMprValidation({
   // Don't show if no MPR ID submitted yet
   if (!mprId && mprStatus === 'DRAFT') {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Key className="h-5 w-5" />
-            Identifiant MaPrimeRénov'
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-6 text-gray-500">
-            <Key className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p>Le client n'a pas encore renseigné son identifiant MaPrimeRénov'</p>
+      <div className="border border-gray-200 rounded-xl bg-white">
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-gray-100 rounded-lg">
+              <Key className="h-4 w-4 text-gray-400" />
+            </div>
+            <div>
+              <p className="font-medium text-gray-900 text-sm">Identifiant MaPrimeRénov'</p>
+              <p className="text-xs text-gray-500">Non renseigné par le client</p>
+            </div>
           </div>
-        </CardContent>
-      </Card>
+          <Badge variant="secondary">En attente</Badge>
+        </div>
+      </div>
     )
   }
 
-  return (
-    <Card className={mprStatus === 'PENDING_REVIEW' ? 'border-amber-300 bg-amber-50' : ''}>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Key className="h-5 w-5" />
-            <CardTitle>Identifiant MaPrimeRénov'</CardTitle>
-          </div>
-          {getStatusBadge()}
-        </div>
-        <CardDescription>
-          Vérifiez l'identifiant soumis par {clientName}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {error && (
-          <Alert variant="error" title="Erreur">
-            {error}
-          </Alert>
-        )}
+  // Compact view when approved/rejected (not pending)
+  const isPending = mprStatus === 'PENDING_REVIEW'
 
-        {/* Current MPR ID */}
-        <div className="p-4 bg-white border rounded-lg">
-          <div className="flex items-center justify-between">
+  return (
+    <div className={`border rounded-xl bg-white overflow-hidden ${isPending ? 'border-amber-300' : 'border-gray-200'}`}>
+      {/* Header - Always visible */}
+      <button
+        type="button"
+        onClick={() => setIsExpanded(!isExpanded)}
+        className={`w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors ${isPending ? 'bg-amber-50' : ''}`}
+      >
+        <div className="flex items-center gap-3">
+          <div className={`p-2.5 rounded-lg ${isPending ? 'bg-amber-100' : 'bg-gray-100'}`}>
+            <Key className={`h-5 w-5 ${isPending ? 'text-amber-600' : 'text-gray-500'}`} />
+          </div>
+          <div className="text-left">
+            <div className="flex items-center gap-2">
+              <p className="font-semibold text-gray-900">Identifiant MaPrimeRénov'</p>
+              {getStatusBadge()}
+            </div>
+            <p className="text-sm text-gray-500 font-mono mt-0.5">{mprId}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {isExpanded ? (
+            <ChevronUp className="h-5 w-5 text-gray-400" />
+          ) : (
+            <ChevronDown className="h-5 w-5 text-gray-400" />
+          )}
+        </div>
+      </button>
+
+      {/* Expanded content */}
+      {isExpanded && (
+        <div className="px-5 pb-5 space-y-4 border-t border-gray-100">
+          {error && (
+            <Alert variant="error" title="Erreur" className="mt-4">
+              {error}
+            </Alert>
+          )}
+
+          {/* Details */}
+          <div className="pt-4 flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500 mb-1">Identifiant soumis</p>
-              <p className="font-mono text-xl font-bold text-gray-900">{mprId}</p>
+              <p className="text-xs text-gray-500">Soumis par {clientName}</p>
               {mprSubmittedAt && (
-                <p className="text-xs text-gray-500 mt-1">
-                  Soumis le {formatDate(mprSubmittedAt)}
+                <p className="text-xs text-gray-400">
+                  {formatDate(mprSubmittedAt)}
                 </p>
               )}
             </div>
@@ -203,137 +228,141 @@ export function AdminMprValidation({
               href="https://www.maprimerenov.gouv.fr/"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
+              className="text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1"
             >
               Vérifier sur MPR
               <ExternalLink className="h-3 w-3" />
             </a>
           </div>
-        </div>
 
-        {/* Validation Actions */}
-        {mprStatus === 'PENDING_REVIEW' && (
-          <div className="space-y-4">
-            {!showRejectForm ? (
-              <div className="flex gap-3">
-                <Button
-                  onClick={handleApprove}
-                  disabled={isLoading !== null}
-                  className="flex-1 bg-green-600 hover:bg-green-700"
-                >
-                  {isLoading === 'approve' ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                  )}
-                  Valider l'identifiant
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowRejectForm(true)}
-                  disabled={isLoading !== null}
-                  className="flex-1 border-red-300 text-red-600 hover:bg-red-50"
-                >
-                  <XCircle className="h-4 w-4 mr-2" />
-                  Rejeter
-                </Button>
-              </div>
-            ) : (
-              <div className="p-4 bg-red-50 border border-red-200 rounded-lg space-y-3">
-                <p className="text-sm font-medium text-red-800">
-                  Raison du rejet (sera communiquée au client)
-                </p>
-                <textarea
-                  value={rejectMessage}
-                  onChange={(e) => setRejectMessage(e.target.value)}
-                  placeholder="Ex: L'identifiant ne correspond pas au format attendu..."
-                  className="w-full p-3 border border-red-200 rounded-lg text-sm resize-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
-                  rows={3}
-                />
+          {/* Validation Actions */}
+          {isPending && (
+            <div className="space-y-3">
+              {!showRejectForm ? (
                 <div className="flex gap-2">
                   <Button
-                    onClick={handleReject}
-                    disabled={isLoading !== null || !rejectMessage.trim()}
-                    className="bg-red-600 hover:bg-red-700"
+                    onClick={handleApprove}
+                    disabled={isLoading !== null}
+                    size="sm"
+                    className="flex-1 bg-green-600 hover:bg-green-700"
                   >
-                    {isLoading === 'reject' ? (
+                    {isLoading === 'approve' ? (
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     ) : (
-                      <XCircle className="h-4 w-4 mr-2" />
+                      <CheckCircle className="h-4 w-4 mr-2" />
                     )}
-                    Confirmer le rejet
+                    Valider
                   </Button>
                   <Button
-                    variant="ghost"
-                    onClick={() => {
-                      setShowRejectForm(false)
-                      setRejectMessage('')
-                    }}
+                    variant="outline"
+                    onClick={() => setShowRejectForm(true)}
                     disabled={isLoading !== null}
+                    size="sm"
+                    className="flex-1 border-red-300 text-red-600 hover:bg-red-50"
                   >
-                    Annuler
+                    <XCircle className="h-4 w-4 mr-2" />
+                    Rejeter
                   </Button>
                 </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Status Messages */}
-        {mprStatus === 'APPROVED' && (
-          <Alert variant="success" title="Identifiant validé">
-            Cet identifiant a été vérifié et validé.
-          </Alert>
-        )}
-
-        {mprStatus === 'REJECTED' && (
-          <Alert variant="error" title="Identifiant rejeté">
-            Le client doit soumettre un nouvel identifiant.
-          </Alert>
-        )}
-
-        {/* History */}
-        {mprHistory && mprHistory.length > 0 && (
-          <div>
-            <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
-              <History className="h-4 w-4" />
-              Historique
-            </h4>
-            <div className="space-y-2">
-              {mprHistory.map((entry) => (
-                <div
-                  key={entry.id}
-                  className="flex items-start gap-3 text-sm p-2 bg-gray-50 rounded"
-                >
-                  <div
-                    className={`mt-0.5 w-2 h-2 rounded-full ${
-                      entry.action === 'APPROVED'
-                        ? 'bg-green-500'
-                        : entry.action === 'REJECTED'
-                        ? 'bg-red-500'
-                        : 'bg-blue-500'
-                    }`}
+              ) : (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg space-y-2">
+                  <p className="text-xs font-medium text-red-800">
+                    Raison du rejet
+                  </p>
+                  <textarea
+                    value={rejectMessage}
+                    onChange={(e) => setRejectMessage(e.target.value)}
+                    placeholder="Ex: L'identifiant ne correspond pas..."
+                    className="w-full p-2 border border-red-200 rounded-lg text-sm resize-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                    rows={2}
                   />
-                  <div className="flex-1">
-                    <p className="text-gray-900">
-                      <span className="font-medium">{getActionLabel(entry.action)}</span>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleReject}
+                      disabled={isLoading !== null || !rejectMessage.trim()}
+                      size="sm"
+                      className="bg-red-600 hover:bg-red-700"
+                    >
+                      {isLoading === 'reject' ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <XCircle className="h-4 w-4 mr-2" />
+                      )}
+                      Confirmer
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setShowRejectForm(false)
+                        setRejectMessage('')
+                      }}
+                      disabled={isLoading !== null}
+                    >
+                      Annuler
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Status Messages */}
+          {mprStatus === 'APPROVED' && (
+            <div className="flex items-center gap-2 text-green-700 text-sm bg-green-50 px-3 py-2 rounded-lg">
+              <CheckCircle className="h-4 w-4" />
+              Identifiant vérifié et validé
+            </div>
+          )}
+
+          {mprStatus === 'REJECTED' && (
+            <div className="flex items-center gap-2 text-red-700 text-sm bg-red-50 px-3 py-2 rounded-lg">
+              <XCircle className="h-4 w-4" />
+              Le client doit soumettre un nouvel identifiant
+            </div>
+          )}
+
+          {/* History */}
+          {mprHistory && mprHistory.length > 0 && (
+            <div>
+              <button
+                type="button"
+                className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1 hover:text-gray-700"
+              >
+                <History className="h-3 w-3" />
+                Historique ({mprHistory.length})
+              </button>
+              <div className="space-y-1">
+                {mprHistory.map((entry) => (
+                  <div
+                    key={entry.id}
+                    className="flex items-start gap-2 text-xs p-2 bg-gray-50 rounded"
+                  >
+                    <div
+                      className={`mt-1 w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                        entry.action === 'APPROVED'
+                          ? 'bg-green-500'
+                          : entry.action === 'REJECTED'
+                          ? 'bg-red-500'
+                          : 'bg-blue-500'
+                      }`}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <span className="font-medium text-gray-700">{getActionLabel(entry.action)}</span>
                       {entry.newValue && (
                         <span className="text-gray-500"> - {entry.newValue}</span>
                       )}
-                    </p>
-                    {entry.message && (
-                      <p className="text-gray-500 text-xs mt-0.5">{entry.message}</p>
-                    )}
-                    <p className="text-gray-400 text-xs mt-1">
-                      {formatDate(entry.createdAt)} par {entry.actorType === 'CLIENT' ? 'Client' : 'Admin'}
-                    </p>
+                      <p className="text-gray-400 mt-0.5">
+                        {formatDate(entry.createdAt)} • {entry.actorType === 'CLIENT' ? 'Client' : 'Admin'}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          )}
+        </div>
+      )}
+    </div>
   )
 }

@@ -12,9 +12,14 @@ export default async function DashboardLayout({
 }) {
   const user = await requireAuth()
 
+  const isArtisan = user.role === 'ARTISAN'
+
   // Get user's dossiers with steps (for chat and action required check)
+  // For artisans, get dossiers they manage; for clients, get their own dossiers
   const dossiers = await prisma.dossier.findMany({
-    where: { clientId: user.id },
+    where: isArtisan
+      ? { artisanId: user.id }
+      : { clientId: user.id },
     select: {
       id: true,
       reference: true,
@@ -25,12 +30,10 @@ export default async function DashboardLayout({
     orderBy: { createdAt: 'desc' },
   })
 
-  const dossier = dossiers[0] || null
-
-  // Check if any action is required (AVAILABLE, IN_PROGRESS, or BLOCKED status)
-  const hasActionRequired = dossier?.steps.some(
-    step => step.status === 'AVAILABLE' || step.status === 'IN_PROGRESS' || step.status === 'BLOCKED'
-  ) ?? false
+  // Check if any action is required across all dossiers
+  const hasActionRequired = dossiers.some(d =>
+    d.steps.some(step => step.status === 'AVAILABLE' || step.status === 'IN_PROGRESS' || step.status === 'BLOCKED')
+  )
 
   // Get user preferences and avatar
   const userPrefs = await prisma.user.findUnique({
@@ -45,7 +48,9 @@ export default async function DashboardLayout({
     }),
     prisma.message.count({
       where: {
-        dossier: { clientId: user.id },
+        dossier: isArtisan
+          ? { artisanId: user.id }
+          : { clientId: user.id },
         isRead: false,
         messageType: { in: ['ADMIN', 'SYSTEM'] },
       },
@@ -72,7 +77,7 @@ export default async function DashboardLayout({
 
           <Sidebar
             user={user}
-            dossier={dossier}
+            dossiersCount={dossiers.length}
             unreadNotifications={unreadNotifications}
             unreadMessages={unreadMessages}
             hasActionRequired={hasActionRequired}

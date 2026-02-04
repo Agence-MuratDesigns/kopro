@@ -9,6 +9,8 @@ import { stepStatusLabels, stepStatusColors, documentTypeLabels } from '@/lib/ut
 import { StepActionForm } from './step-action-form'
 import { DocumentUpload } from './document-upload'
 import { MprIdentifierForm } from '@/components/dashboard/mpr-identifier-form'
+import { ProjectInfoForm } from '@/components/dashboard/project-info-form'
+import { PaymentForm } from '@/components/dashboard/payment-form'
 import { MandateSignatureForm } from '@/components/dashboard/mandate-signature-form'
 import { WorkSelectionForm } from '@/components/dashboard/work-selection-form'
 import { QuoteDepositForm } from '@/components/dashboard/quote-deposit-form'
@@ -32,6 +34,8 @@ interface Props {
 // Step codes that have custom forms
 const CUSTOM_FORM_STEPS = [
   'MPR_IDENTIFIER',
+  'PROJECT_INFO',
+  'PAYMENT',
   'MANDATE_SIGNATURE',
   'WORK_SELECTION',
   'QUOTE_DEPOSIT',
@@ -61,7 +65,11 @@ export default async function StepPage({ params }: Props) {
     },
   })
 
-  if (!dossier || dossier.clientId !== user.id) {
+  // Check access: client owns the dossier OR artisan manages it
+  const isOwner = dossier?.clientId === user.id
+  const isArtisanManager = user.role === 'ARTISAN' && dossier?.artisanId === user.id
+
+  if (!dossier || (!isOwner && !isArtisanManager)) {
     notFound()
   }
 
@@ -163,7 +171,48 @@ export default async function StepPage({ params }: Props) {
         />
       )}
 
-      {/* Step 3: Mandate Signature Form */}
+      {/* Step 3: Project Info Form */}
+      {code === 'PROJECT_INFO' && (() => {
+        // Find PROJECT_INFO step for documents
+        const projectInfoStep = dossier.steps.find(s => s.template.code === 'PROJECT_INFO')
+        const projectDocs = dossier.documents
+          .filter(d => d.stepId === projectInfoStep?.id)
+          .map(d => ({
+            id: d.id,
+            name: d.name,
+            type: d.type,
+            status: d.status,
+            url: `/api/dossiers/${id}/documents/${d.id}/view`,
+          }))
+        return (
+          <ProjectInfoForm
+            dossierId={id}
+            projectInfoStatus={dossier.projectInfoStatus}
+            projectInfoReviewMessage={dossier.projectInfoReviewMessage}
+            projectInfoLastSavedAt={dossier.projectInfoLastSavedAt?.toISOString() ?? null}
+            energyType={dossier.energyType}
+            housingType={dossier.housingType}
+            housingSurface={dossier.housingSurface}
+            constructionYear={dossier.constructionYear}
+            revenueCategory={dossier.revenueCategory}
+            householdSize={dossier.householdSize}
+            ownershipStatus={dossier.ownershipStatus}
+            documents={projectDocs}
+          />
+        )
+      })()}
+
+      {/* Step 4: Payment Form */}
+      {code === 'PAYMENT' && (
+        <PaymentForm
+          dossierId={id}
+          paymentStatus={dossier.servicePaymentStatus}
+          paymentAmount={dossier.servicePaymentAmount}
+          paymentCompletedAt={dossier.servicePaymentCompletedAt?.toISOString() || null}
+        />
+      )}
+
+      {/* Step 5: Mandate Signature Form */}
       {code === 'MANDATE_SIGNATURE' && (
         <MandateSignatureForm
           dossierId={id}
@@ -172,9 +221,9 @@ export default async function StepPage({ params }: Props) {
         />
       )}
 
-      {/* Step 4: Work Selection Form */}
+      {/* Step 6: Work Selection Form */}
       {code === 'WORK_SELECTION' && (() => {
-        // Vérifier si l'étape 5 (devis) est validée
+        // Vérifier si l'étape 6 (devis) est validée
         const quoteStep = dossier.steps.find(s => s.template.code === 'QUOTE_DEPOSIT')
         const canModifyWorks = !quoteStep || quoteStep.status !== 'VALIDATED'
         return (
@@ -187,7 +236,7 @@ export default async function StepPage({ params }: Props) {
         )
       })()}
 
-      {/* Step 5: Quote Deposit Form */}
+      {/* Step 7: Quote Deposit Form */}
       {code === 'QUOTE_DEPOSIT' && (
         <QuoteDepositForm
           dossierId={id}
@@ -199,13 +248,15 @@ export default async function StepPage({ params }: Props) {
             .map(d => ({
               id: d.id,
               name: d.name,
-              workType: (d as any).workType || 'UNKNOWN',
+              workType: d.workType || 'UNKNOWN',
               status: d.status,
+              url: `/api/dossiers/${id}/documents/${d.id}/view`,
+              size: d.fileSize,
             }))}
         />
       )}
 
-      {/* Step 6: Work Authorization Form */}
+      {/* Step 8: Work Start Declaration Form */}
       {code === 'WORK_AUTHORIZATION' && (
         <WorkAuthorizationForm
           dossierId={id}
@@ -214,7 +265,7 @@ export default async function StepPage({ params }: Props) {
         />
       )}
 
-      {/* Step 7: Invoice Deposit Form */}
+      {/* Step 9: Invoice Deposit Form */}
       {code === 'INVOICE_DEPOSIT' && (
         <InvoiceDepositForm
           dossierId={id}
@@ -226,13 +277,15 @@ export default async function StepPage({ params }: Props) {
             .map(d => ({
               id: d.id,
               name: d.name,
-              workType: (d as any).workType || 'UNKNOWN',
+              workType: d.workType || 'UNKNOWN',
               status: d.status,
+              url: `/api/dossiers/${id}/documents/${d.id}/view`,
+              size: d.fileSize,
             }))}
         />
       )}
 
-      {/* Step 8: Final Recap */}
+      {/* Step 10: Final Recap */}
       {code === 'FINAL_RECAP' && (
         <FinalRecap
           dossier={{
@@ -251,14 +304,16 @@ export default async function StepPage({ params }: Props) {
             paymentStatus: dossier.paymentStatus,
           }}
           client={{
-            firstName: dossier.client.firstName,
-            lastName: dossier.client.lastName,
+            firstName: dossier.client?.firstName || dossier.endClientFirstName || '',
+            lastName: dossier.client?.lastName || dossier.endClientLastName || '',
           }}
           documents={dossier.documents.map(d => ({
             id: d.id,
             name: d.name,
             type: d.type,
             uploadedAt: d.uploadedAt.toISOString(),
+            url: `/api/dossiers/${id}/documents/${d.id}/view`,
+            size: d.fileSize,
           }))}
         />
       )}

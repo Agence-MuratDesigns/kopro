@@ -7,7 +7,10 @@ import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { StepTimeline } from '@/components/dashboard/step-timeline'
 import { ProjectInfoCard } from '@/components/dashboard/project-info-card'
-import { formatDate } from '@/lib/utils'
+import { DossierDocumentsCard } from '@/components/dashboard/dossier-documents-card'
+import { DeleteDossierButton } from '@/components/dashboard/delete-dossier-button'
+import { PaymentStatusCard } from '@/components/dashboard/payment-status-card'
+import { formatDate, formatDossierStatus } from '@/lib/utils'
 import Link from 'next/link'
 import {
   ArrowLeft,
@@ -24,14 +27,23 @@ export default async function DossierPage({ params }: Props) {
   const user = await requireAuth()
   const dossier = await getDossierWithSteps(id)
 
-  if (!dossier || dossier.clientId !== user.id) {
+  // Check access: client owns the dossier OR artisan manages it
+  const isOwner = dossier?.clientId === user.id
+  const isArtisanManager = user.role === 'ARTISAN' && dossier?.artisanId === user.id
+
+  if (!dossier || (!isOwner && !isArtisanManager)) {
     notFound()
   }
+
+  const isArtisan = user.role === 'ARTISAN'
 
   const progress = calculateProgress(dossier.steps)
   const currentStep = dossier.steps.find(
     s => s.status === 'IN_PROGRESS' || s.status === 'AVAILABLE' || s.status === 'PENDING_VALIDATION'
   )
+
+  // Vérifier si le dossier peut être supprimé (mandat non encore validé)
+  const canDelete = dossier.mandatStatus !== 'APPROVED'
 
 
   return (
@@ -51,10 +63,13 @@ export default async function DossierPage({ params }: Props) {
                 Dossier {dossier.reference}
               </h1>
               <Badge variant={dossier.status === 'TERMINE' ? 'success' : 'info'}>
-                {dossier.status.replace('_', ' ')}
+                {formatDossierStatus(dossier.status)}
               </Badge>
             </div>
             <p className="text-gray-600 mt-1">
+              {isArtisan && dossier.endClientFirstName && (
+                <span className="font-medium">{dossier.endClientFirstName} {dossier.endClientLastName} • </span>
+              )}
               Créé le {formatDate(dossier.createdAt)}
             </p>
           </div>
@@ -83,13 +98,37 @@ export default async function DossierPage({ params }: Props) {
           {/* Project Info */}
           <ProjectInfoCard
             dossierId={dossier.id}
-            projectType={dossier.projectType}
-            projectAddress={dossier.projectAddress}
-            projectCity={dossier.projectCity}
-            projectPostalCode={dossier.projectPostalCode}
-            estimatedBudget={dossier.estimatedBudget}
+            projectInfoStatus={dossier.projectInfoStatus}
+            mprStatus={dossier.mprStatus}
+            housingType={dossier.housingType}
             revenueCategory={dossier.revenueCategory}
             householdSize={dossier.householdSize}
+            housingSurface={dossier.housingSurface}
+            constructionYear={dossier.constructionYear}
+          />
+
+          {/* Payment Status */}
+          <PaymentStatusCard
+            dossierId={dossier.id}
+            paymentStatus={dossier.servicePaymentStatus}
+            paymentAmount={dossier.servicePaymentAmount}
+            paymentCompletedAt={dossier.servicePaymentCompletedAt}
+            currentStepCode={currentStep?.template.code}
+          />
+
+          {/* Documents */}
+          <DossierDocumentsCard
+            dossierId={dossier.id}
+            documents={dossier.documents.map(doc => ({
+              id: doc.id,
+              name: doc.name,
+              type: doc.type,
+              workType: doc.workType,
+              fileName: doc.fileName,
+              fileSize: doc.fileSize,
+              status: doc.status,
+              uploadedAt: doc.uploadedAt.toISOString(),
+            }))}
           />
 
           {/* Advisor */}
@@ -121,6 +160,21 @@ export default async function DossierPage({ params }: Props) {
                     Contacter
                   </Button>
                 </Link>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Delete Dossier - Only if mandate not approved */}
+          {canDelete && (
+            <Card className="border-red-100">
+              <CardContent className="py-4">
+                <p className="text-sm text-gray-500 mb-3">
+                  Ce dossier peut être supprimé car il n'a pas encore été engagé.
+                </p>
+                <DeleteDossierButton
+                  dossierId={dossier.id}
+                  dossierReference={dossier.reference}
+                />
               </CardContent>
             </Card>
           )}

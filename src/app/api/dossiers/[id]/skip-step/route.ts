@@ -42,7 +42,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Dossier non trouvé' }, { status: 404 })
     }
 
-    if (dossier.clientId !== user.id) {
+    // Check access: client owns the dossier OR artisan manages it
+    const isOwner = dossier.clientId === user.id
+    const isArtisanManager = user.role === 'ARTISAN' && dossier.artisanId === user.id
+    if (!isOwner && !isArtisanManager) {
       return NextResponse.json({ error: 'Accès non autorisé' }, { status: 403 })
     }
 

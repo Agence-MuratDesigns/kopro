@@ -6,6 +6,7 @@ import { ProfileForm } from './profile-form'
 import { AvatarUpload } from './avatar-upload'
 import { PreferencesForm } from './preferences-form'
 import { SecurityForm } from './security-form'
+import { ArtisanCompanyForm } from './artisan-company-form'
 import {
   User,
   Calendar,
@@ -13,10 +14,13 @@ import {
   Clock,
   Settings,
   ImageIcon,
+  Building2,
 } from 'lucide-react'
 
 export default async function ProfilePage() {
   const user = await requireAuth()
+
+  const isArtisan = user.role === 'ARTISAN'
 
   // Get full user details
   const fullUser = await prisma.user.findUnique({
@@ -39,6 +43,14 @@ export default async function ProfilePage() {
       emailNotifications: true,
       pushNotifications: true,
       preferredChannel: true,
+      // Artisan fields
+      role: true,
+      companyName: true,
+      siret: true,
+      companyAddress: true,
+      companyPostalCode: true,
+      companyCity: true,
+      rgeQualifications: true,
     },
   })
 
@@ -111,6 +123,24 @@ export default async function ProfilePage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Artisan Company Info - Full width (only for artisans) */}
+      {isArtisan && (
+        <Card>
+          <CardContent className="py-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 bg-accent-light rounded-lg">
+                <Building2 className="h-5 w-5 text-accent" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-kopro-dark">Mon entreprise</h2>
+                <p className="text-sm text-kopro-grey">Informations de votre société et certifications RGE</p>
+              </div>
+            </div>
+            <ArtisanCompanyForm user={fullUser} />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Profile Form - Full width */}
       <Card>
